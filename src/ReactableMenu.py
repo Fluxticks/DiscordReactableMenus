@@ -23,17 +23,28 @@ class ReactableMenu(Embed):
     def __repr__(self):
         return repr(self.options)
 
-    def add_option(self, emoji, descriptor) -> bool:
-        pass
+    def add_option(self, emoji: str, descriptor: str) -> bool:
+        if emoji in self.options:
+            return False
 
-    def remove_option(self, emoji) -> bool:
-        pass
+        self.options[emoji] = descriptor
 
-    def add_many(self, options) -> List[bool]:
-        pass
+    def remove_option(self, emoji: str) -> bool:
+        return self.options.pop(emoji, None) is not None
 
-    def remove_many(self, emojis) -> List[bool]:
-        pass
+    def add_many(self, options: Dict[str, str]) -> List[Dict[str, str]]:
+        failed = []
+        for emoji, descriptor in options.items():
+            if not self.add_option(emoji, descriptor):
+                failed.append({emoji: descriptor})
+        return failed
+
+    def remove_many(self, emojis: List[str]) -> List[str]:
+        failed = []
+        for emoji in emojis:
+            if not self.remove_option(emoji):
+                failed.append(emoji)
+        return failed
 
     def to_dict(self) -> Dict:
         pass
