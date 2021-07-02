@@ -61,3 +61,13 @@ class ReactableMenu(Embed):
         self.message: Message = await context.send(embed=self)
         self.id = self.message.id
         return self.message
+
+    def on_react(self, payload):
+        if self.react_add_func:
+            return self.react_add_func(payload)
+        return None
+
+    def on_react_remove(self, payload):
+        if self.react_remove_func:
+            return self.react_remove_func(payload)
+        return None
