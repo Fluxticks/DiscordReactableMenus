@@ -15,7 +15,13 @@ class ReactableMenu(Embed):
         self.options = {}
 
     def __str__(self) -> str:
-        return super().__str__()
+        __str = ""
+        for emoji, descriptor in self.options.items():
+            __str += f"Emoji: {emoji} | Descriptor: {descriptor}\n"
+        return __str
+
+    def __repr__(self):
+        return repr(self.options)
 
     def add_option(self, emoji, descriptor) -> bool:
         pass
