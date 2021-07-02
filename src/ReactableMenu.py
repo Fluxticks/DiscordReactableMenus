@@ -46,6 +46,11 @@ class ReactableMenu(Embed):
                 failed.append(emoji)
         return failed
 
+    def generate_embed(self) -> Embed:
+        for emoji, descriptor in self.options:
+            self.add_field(name=emoji, value=descriptor, inline=False)
+        return self
+
     def to_dict(self) -> Dict:
         pass
 
