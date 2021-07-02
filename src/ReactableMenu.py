@@ -34,3 +34,8 @@ class ReactableMenu(Embed):
 
     def from_dict(self, data: Dict):
         pass
+
+    async def send_to_context(self, context: Context) -> Message:
+        self.message: Message = await context.send(embed=self)
+        self.id = self.message.id
+        return self.message
