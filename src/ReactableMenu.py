@@ -1,6 +1,6 @@
 from typing import Dict, List
 
-from discord import Embed, Message, Emoji
+from discord import Embed, Message, Emoji, TextChannel
 
 
 class ReactableMenu:
@@ -71,31 +71,38 @@ class ReactableMenu:
         self.embed = Embed.from_dict(old_data)
         return self.embed
 
-    def enable_menu(self):
+    def enable_menu(self, bot):
         self.enabled = True
+        bot.add_listener(self.on_react_add, "on_raw_reaction_add")
+        bot.add_listener(self.on_react_remove, "on_raw_reaction_remove")
 
-    def disable_menu(self):
+    def disable_menu(self, bot):
         self.enabled = False
+        bot.remove_listener(self.on_react_add, "on_raw_reaction_add")
+        bot.remove_listener(self.on_react_remove, "on_raw_reaction_remove")
 
-    def toggle_menu(self):
-        self.enabled = not self.enabled
+    def toggle_menu(self, bot):
+        if not self.enabled:
+            self.enable_menu(bot)
+        else:
+            self.disable_menu(bot)
 
-    async def finalise_and_send(self, message: Message):
+    async def finalise_and_send(self, bot, channel: TextChannel):
         self.generate_embed()
-        await self.send_to_context(message)
+        await self.send_to_channel(channel)
         self.add_footer()
         await self.message.edit(embed=self.embed)
         await self.add_reactions(self.message)
         if self.auto_enable:
-            self.enabled = True
+            self.enable_menu(bot)
 
     async def update_message(self):
         self.generate_embed()
         await self.message.edit(embed=self.embed)
         await self.add_reactions()
 
-    async def send_to_context(self, message: Message) -> Message:
-        self.message: Message = await message.channel.send(embed=self.embed)
+    async def send_to_channel(self, channel: TextChannel) -> Message:
+        self.message: Message = await channel.send(embed=self.embed)
         self.id = self.message.id
         return self.message
 
@@ -112,7 +119,7 @@ class ReactableMenu:
             if emoji not in current_reactions:
                 await message.add_reaction(emoji)
 
-    async def on_react(self, payload):
+    async def on_react_add(self, payload):
         if self.react_add_func and self.enabled and payload.message_id == self.id:
             return self.react_add_func(payload)
         return None
