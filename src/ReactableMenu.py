@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Any
 
 from discord import Embed, Message, Emoji, TextChannel
 
@@ -27,7 +27,7 @@ class ReactableMenu:
     def __repr__(self):
         return repr(self.options)
 
-    def add_option(self, emoji: Emoji, descriptor: str) -> bool:
+    def add_option(self, emoji: Emoji, descriptor: Any) -> bool:
         if emoji in self.options:
             return False
 
@@ -36,7 +36,7 @@ class ReactableMenu:
     def remove_option(self, emoji: Emoji) -> bool:
         return self.options.pop(emoji, None) is not None
 
-    def add_many(self, options: Dict[Emoji, str]) -> List[Dict[Emoji, str]]:
+    def add_many(self, options: Dict[Emoji, Any]) -> List[Dict[Emoji, Any]]:
         failed = []
         for emoji, descriptor in options.items():
             if not self.add_option(emoji, descriptor):
