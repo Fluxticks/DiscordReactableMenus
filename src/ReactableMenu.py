@@ -73,18 +73,11 @@ class ReactableMenu:
     async def update_message(self):
         self.generate_embed()
         await self.message.edit(embed=self.embed)
-
-    def to_dict(self) -> Dict:
-        pass
-
-    def from_dict(self, data: Dict):
-        pass
+        await self.add_reactions()
 
     async def send_to_context(self, message: Message) -> Message:
         self.message: Message = await message.channel.send(embed=self.embed)
         self.id = self.message.id
-        await self.add_reactions(self.message)
-        self.enabled = True
         return self.message
 
     async def add_reactions(self, message: Message = None):
