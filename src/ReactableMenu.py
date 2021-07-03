@@ -134,11 +134,15 @@ class ReactableMenu:
                 await message.add_reaction(emoji)
 
     async def on_react_add(self, payload):
+        if payload is None:
+            return None
         if self.enabled and self.react_add_func and not payload.member.bot and payload.message_id == self.id:
             return await self.react_add_func(payload)
         return None
 
     async def on_react_remove(self, payload):
-        if self.enabled and self.react_remove_func and not payload.member.bot and payload.message_id == self.id:
+        if payload is None:
+            return None
+        if self.enabled and self.react_remove_func and payload.message_id == self.id:
             return await self.react_remove_func(payload)
         return None
