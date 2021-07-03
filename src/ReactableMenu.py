@@ -160,10 +160,8 @@ class ReactableMenu:
         if self.show_ids and self.id:
             embed.set_footer(text=f"Menu message id: {self.id}")
 
-    @staticmethod
-    def remove_footer(embed):
-        if embed.footer:
-            embed.set_footer()
+    def toggle_footer(self):
+        self.show_ids = not self.show_ids
 
     async def update_visuals(self):
         if self.enabled:
@@ -209,6 +207,7 @@ class ReactableMenu:
 
     async def update_message(self):
         embed = self.generate_embed()
+        self.add_footer(embed)
         await self.message.edit(embed=embed)
         if self.enabled:
             await self.add_reactions()
