@@ -1,3 +1,4 @@
+import ast
 from typing import Dict, List, Any, Union
 
 from discord import Embed, Message, Emoji, PartialEmoji, TextChannel
@@ -77,6 +78,10 @@ class ReactableMenu:
     def add_footer(self):
         if self.show_ids and self.id:
             self.embed.set_footer(text=f"Menu message id: {self.id}")
+
+    def remove_footer(self):
+        if self.embed.footer:
+            self.embed.set_footer()
 
     def update_embed(self, **kwargs) -> Embed:
         old_data = self.embed.to_dict()
