@@ -77,8 +77,11 @@ class ReactableMenu:
         if message is None:
             raise ValueError("There is no message to add reactions to")
 
+        current_reactions = [x.emoji for x in message.reactions]
+
         for emoji in self.options:
-            await message.add_reaction(emoji)
+            if emoji not in current_reactions:
+                await message.add_reaction(emoji)
 
     async def on_react(self, payload):
         if self.react_add_func and self.enabled and payload.message_id == self.id:
