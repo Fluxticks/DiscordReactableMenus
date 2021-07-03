@@ -3,8 +3,10 @@ from abc import abstractmethod
 from typing import Dict, List, Any, Union
 
 import discord
-from discord import Embed, Message, Emoji, PartialEmoji, TextChannel
-from emoji import demojize, emojize
+from discord import Embed, HTTPException, Message, Emoji, PartialEmoji, TextChannel
+from emoji import emojize
+
+from EmojiHandler import MultiEmoji, partial_from_emoji, partial_from_string
 
 DISABLED_STRING = " (Currently Disabled)"
 
@@ -46,52 +48,47 @@ class ReactableMenu:
         return self.__getitem__(item) is not None
 
     def __getitem__(self, item: Union[Emoji, PartialEmoji, str]):
-        if isinstance(item, Emoji) or isinstance(item, str):
-            return self.options.get(item)
+        if isinstance(item, str):
+            p_emoji = partial_from_string(item)
         elif isinstance(item, PartialEmoji):
-            if item.id is None:
-                return self.options.get(demojize(item.name, use_aliases=True))
-            emoji_id = item.id
-            for emoji in self.options:
-                if isinstance(emoji, str):
-                    continue
-                if emoji.id == emoji_id:
-                    return self.options.get(emoji)
+            p_emoji = item
+        elif isinstance(item, Emoji):
+            p_emoji = partial_from_emoji(item)
+        else:
+            return None
 
-        return None
+        return self.options.get(p_emoji.id)
 
     def to_dict(self):
         data = {
-                "id": self.id,
-                "guild_id": self.message.guild.id,
-                "channel_id": self.message.channel.id,
-                "options": self.serialize_options(),
-                "enabled": self.enabled,
-                "show_ids": self.show_ids
+            "id": self.id,
+            "guild_id": self.message.guild.id,
+            "channel_id": self.message.channel.id,
+            "options": self.serialize_options(),
+            "enabled": self.enabled,
+            "show_ids": self.show_ids
         }
         return data
 
     def serialize_options(self):
         data = {}
         for option in self.options:
-            if isinstance(option, str):
-                data[option] = {"descriptor": self.options.get(option)}
-            else:
-                data[option.id] = {"descriptor": self.options.get(option)}
+            option_data = self.options.get(option)
+            emoji_data = option_data.get("emoji").to_dict()
+            descriptor = option_data.get("descriptor")
+            data[option] = {"emoji": emoji_data, "descriptor": descriptor}
         return data
 
     @staticmethod
-    def deserialize_options(bot, options) -> Dict[Union[Emoji, str], Any]:
+    def deserialize_options(options) -> Dict[Union[Emoji, str], Any]:
         data = {}
         if isinstance(options, str):
             options = ast.literal_eval(options)
         for option in options:
-            if not str(option).isdigit():
-                emoji = demojize(option, use_aliases=True)
-            else:
-                emoji = bot.get_emoji(option)
-            descriptor = options.get("descriptor")
-            data[emoji] = descriptor
+            option_data = options.get(option)
+            emoji = partial_from_string(option_data.get("emoji"))
+            descriptor = option_data.get("descriptor")
+            data[option] = {"emoji": emoji, "descriptor": descriptor}
         return data
 
     @classmethod
@@ -111,39 +108,50 @@ class ReactableMenu:
         embed = kwargs["message"].embeds[0]
         kwargs["description"] = embed.description
         kwargs["title"] = embed.title
-        kwargs["options"] = cls.deserialize_options(bot, data.get("options"))
+        kwargs["options"] = cls.deserialize_options(data.get("options"))
         kwargs["enabled"] = bool(data.get("enabled"))
         kwargs["show_ids"] = bool(data.get("show_ids"))
-        kwargs["auto_enable"] = False
 
         return kwargs
 
-    def add_option(self, emoji: Union[Emoji, str], descriptor: Any) -> bool:
-        if emoji in self.options:
+    def add_option(self, emoji: Union[Emoji, PartialEmoji, MultiEmoji, str], descriptor: Any) -> bool:
+        try:
+            formatted_emoji = MultiEmoji.get_emoji_from_input(emoji)
+
+            if formatted_emoji.emoji_id in self.options:
+                return False
+
+            self.options[formatted_emoji.emoji_id] = {"emoji": formatted_emoji, "descriptor": descriptor}
+            return True
+        except ValueError:
             return False
 
-        self.options[emoji] = descriptor
+    def remove_option(self, emoji: Union[Emoji, PartialEmoji, MultiEmoji, str]) -> bool:
+        try:
+            formatted_emoji = MultiEmoji.get_emoji_from_input(emoji)
+            return self.options.pop(formatted_emoji.emoji_id, None) is not None
+        except ValueError:
+            return False
 
-    def remove_option(self, emoji: Emoji) -> bool:
-        return self.options.pop(emoji, None) is not None
-
-    def add_many(self, options: Dict[Union[Emoji, str], Any]) -> List[Dict[Union[Emoji, str], Any]]:
+    def add_many(self, options: Dict[Union[Emoji, PartialEmoji, str], Any]) -> List[Dict[str, str]]:
         failed = []
         for emoji, descriptor in options.items():
             if not self.add_option(emoji, descriptor):
                 failed.append({emoji: descriptor})
         return failed
 
-    def remove_many(self, emojis: List[Union[Emoji, str]]) -> List[Union[Emoji, str]]:
+    def remove_many(self, emojis: List[Union[Emoji, PartialEmoji, str]]) -> List[str]:
         failed = []
         for emoji in emojis:
             if not self.remove_option(emoji):
-                failed.append(emoji)
+                failed.append(str(emoji))
         return failed
 
     def generate_embed(self) -> Embed:
         embed = Embed(title=self.title, description=self.description, colour=self.colour)
-        for emoji, descriptor in self.options.items():
+        for emoji_id in self.options:
+            emoji = self.options.get(emoji_id).get("emoji").discord_emoji
+            descriptor = self.options.get(emoji_id).get("descriptor")
             embed.add_field(name=emoji, value=descriptor, inline=self.use_inline)
 
         return embed
@@ -221,11 +229,12 @@ class ReactableMenu:
 
         await message.clear_reactions()
 
-        for emoji in self.options:
-            if isinstance(emoji, str):
-                await message.add_reaction(emojize(emoji, use_aliases=True))
-            else:
-                await message.add_reaction(emoji)
+        for emoji_id in self.options:
+            emoji = self.options.get(emoji_id).get("emoji")
+            try:
+                await message.add_reaction(emoji.discord_emoji)
+            except HTTPException:
+                pass
 
     async def on_react_add(self, payload):
         if payload is None:
