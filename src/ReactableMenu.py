@@ -73,8 +73,25 @@ class ReactableMenu:
 
     @classmethod
     @abstractmethod
-    async def from_dict(cls, bot, data):
-        pass
+    async def from_dict(cls, bot, data) -> Dict:
+        kwargs = {"id": int(data.get("id"))}
+
+        guild_id = int(data.get("guild_id"))
+        channel_id = int(data.get("channel_id"))
+        kwargs["message"] = await bot.get_guild(guild_id).get_channel(channel_id).fetch_message(kwargs["id"])
+        if kwargs["message"] is None:
+            raise ValueError("The message for this reaction menu has been deleted!")
+
+        if not kwargs["message"].embeds:
+            raise ValueError("The message for this reaction menu has no menu in it!")
+
+        kwargs["embed"] = kwargs["message"].embeds[0]
+        kwargs["options"] = cls.deserialize_options(bot, data.get("options"))
+        kwargs["enabled"] = bool(data.get("enabled"))
+        kwargs["show_ids"] = bool(data.get("show_ids"))
+        kwargs["auto_enable"] = False
+
+        return kwargs
 
     def add_option(self, emoji: Emoji, descriptor: Any) -> bool:
         if emoji in self.options:
