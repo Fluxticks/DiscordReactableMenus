@@ -141,16 +141,18 @@ class ReactableMenu:
         self.embed = Embed.from_dict(old_data)
         return self.embed
 
-    def enable_menu(self, bot) -> bool:
+    async def enable_menu(self, bot) -> bool:
         if not self.enabled:
+            await self.add_reactions(self.message)
             self.enabled = True
             bot.add_listener(self.on_react_add, "on_raw_reaction_add")
             bot.add_listener(self.on_react_remove, "on_raw_reaction_remove")
             return True
         return False
 
-    def disable_menu(self, bot) -> bool:
+    async def disable_menu(self, bot) -> bool:
         if self.enabled:
+            await self.message.clear_reactions()
             self.enabled = False
             bot.remove_listener(self.on_react_add, "on_raw_reaction_add")
             bot.remove_listener(self.on_react_remove, "on_raw_reaction_remove")
@@ -159,9 +161,9 @@ class ReactableMenu:
 
     def toggle_menu(self, bot) -> bool:
         if not self.enabled:
-            return self.enable_menu(bot)
+            return await self.enable_menu(bot)
         else:
-            return self.disable_menu(bot)
+            return await self.disable_menu(bot)
 
     async def finalise_and_send(self, bot, channel: TextChannel):
         self.generate_embed()
@@ -170,7 +172,7 @@ class ReactableMenu:
         await self.message.edit(embed=self.embed)
         await self.add_reactions(self.message)
         if self.auto_enable:
-            self.enable_menu(bot)
+            await self.enable_menu(bot)
 
     async def update_message(self):
         self.generate_embed()
@@ -189,11 +191,12 @@ class ReactableMenu:
         if message is None:
             raise ValueError("There is no message to add reactions to")
 
-        current_reactions = [x.emoji for x in message.reactions]
+        # current_reactions = [x.emoji for x in message.reactions]
+        await message.clear_reactions()
 
         for emoji in self.options:
-            if emoji not in current_reactions:
-                await message.add_reaction(emoji)
+            # if emoji not in current_reactions:
+            await message.add_reaction(emoji)
 
     async def on_react_add(self, payload):
         if payload is None:
