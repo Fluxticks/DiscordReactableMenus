@@ -77,6 +77,9 @@ class ReactableMenu:
     def disable_menu(self):
         self.enabled = False
 
+    def toggle_menu(self):
+        self.enabled = not self.enabled
+
     async def finalise_and_send(self, message: Message):
         self.generate_embed()
         await self.send_to_context(message)
