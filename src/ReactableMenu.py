@@ -74,7 +74,10 @@ class ReactableMenu:
     def serialize_options(self):
         data = {}
         for option in self.options:
-            data[option.id] = {"descriptor": self.options.get(option)}
+            if isinstance(option, str):
+                data[option] = {"descriptor": self.options.get(option)}
+            else:
+                data[option.id] = {"descriptor": self.options.get(option)}
         return data
 
     @staticmethod
@@ -83,7 +86,10 @@ class ReactableMenu:
         if isinstance(options, str):
             options = ast.literal_eval(options)
         for option in options:
-            emoji = bot.get_emoji(option)
+            if not str(option).isdigit():
+                emoji = demojize(option, use_aliases=True)
+            else:
+                emoji = bot.get_emoji(option)
             descriptor = options.get("descriptor")
             data[emoji] = descriptor
         return data
