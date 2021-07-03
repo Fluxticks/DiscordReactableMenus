@@ -64,6 +64,12 @@ class ReactableMenu:
         self.embed = Embed.from_dict(old_data)
         return self.embed
 
+    async def finalise_and_send(self, message: Message):
+        self.generate_embed()
+        await self.send_to_context(message)
+        await self.add_reactions(self.message)
+        self.enabled = True
+
     async def update_message(self):
         self.generate_embed()
         await self.message.edit(embed=self.embed)
