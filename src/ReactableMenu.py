@@ -4,6 +4,7 @@ from typing import Dict, List, Any, Union
 
 import discord
 from discord import Embed, Message, Emoji, PartialEmoji, TextChannel
+from emoji import demojize, emojize
 
 DISABLED_STRING = "\n*Currently Disabled*"
 
@@ -32,7 +33,10 @@ class ReactableMenu:
     def __str__(self) -> str:
         __str = f"Title:{self.title} | Description: {self.description}"
         for emoji, descriptor in self.options.items():
-            __str += f"\nEmoji: {emoji.name} | Descriptor: {descriptor}"
+            if isinstance(emoji, str):
+                __str += f"\nEmoji: {emojize(emoji)} | Descriptor: {descriptor}"
+            else:
+                __str += f"\nEmoji: {emoji.name} | Descriptor: {descriptor}"
         return __str
 
     def __repr__(self):
@@ -41,12 +45,16 @@ class ReactableMenu:
     def __contains__(self, item):
         return self.__getitem__(item) is not None
 
-    def __getitem__(self, item: Union[Emoji, PartialEmoji]):
-        if isinstance(item, Emoji):
+    def __getitem__(self, item: Union[Emoji, PartialEmoji, str]):
+        if isinstance(item, Emoji) or isinstance(item, str):
             return self.options.get(item)
         elif isinstance(item, PartialEmoji):
+            if item.id is None:
+                return self.options.get(demojize(item.name, use_aliases=True))
             emoji_id = item.id
             for emoji in self.options:
+                if isinstance(emoji, str):
+                    continue
                 if emoji.id == emoji_id:
                     return self.options.get(emoji)
 
@@ -70,7 +78,7 @@ class ReactableMenu:
         return data
 
     @staticmethod
-    def deserialize_options(bot, options) -> Dict[Emoji, Any]:
+    def deserialize_options(bot, options) -> Dict[Union[Emoji, str], Any]:
         data = {}
         if isinstance(options, str):
             options = ast.literal_eval(options)
@@ -104,7 +112,7 @@ class ReactableMenu:
 
         return kwargs
 
-    def add_option(self, emoji: Emoji, descriptor: Any) -> bool:
+    def add_option(self, emoji: Union[Emoji, str], descriptor: Any) -> bool:
         if emoji in self.options:
             return False
 
@@ -113,14 +121,14 @@ class ReactableMenu:
     def remove_option(self, emoji: Emoji) -> bool:
         return self.options.pop(emoji, None) is not None
 
-    def add_many(self, options: Dict[Emoji, Any]) -> List[Dict[Emoji, Any]]:
+    def add_many(self, options: Dict[Union[Emoji, str], Any]) -> List[Dict[Union[Emoji, str], Any]]:
         failed = []
         for emoji, descriptor in options.items():
             if not self.add_option(emoji, descriptor):
                 failed.append({emoji: descriptor})
         return failed
 
-    def remove_many(self, emojis: List[Emoji]) -> List[Emoji]:
+    def remove_many(self, emojis: List[Union[Emoji, str]]) -> List[Union[Emoji, str]]:
         failed = []
         for emoji in emojis:
             if not self.remove_option(emoji):
@@ -205,12 +213,13 @@ class ReactableMenu:
         if message is None:
             raise ValueError("There is no message to add reactions to")
 
-        # current_reactions = [x.emoji for x in message.reactions]
         await message.clear_reactions()
 
         for emoji in self.options:
-            # if emoji not in current_reactions:
-            await message.add_reaction(emoji)
+            if isinstance(emoji, str):
+                await message.add_reaction(emojize(emoji, use_aliases=True))
+            else:
+                await message.add_reaction(emoji)
 
     async def on_react_add(self, payload):
         if payload is None:
