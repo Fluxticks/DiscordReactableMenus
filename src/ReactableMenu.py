@@ -6,7 +6,7 @@ import discord
 from discord import Embed, Message, Emoji, PartialEmoji, TextChannel
 from emoji import demojize, emojize
 
-DISABLED_STRING = "\n*Currently Disabled*"
+DISABLED_STRING = " (Currently Disabled)"
 
 
 class ReactableMenu:
@@ -22,10 +22,10 @@ class ReactableMenu:
         self.title = kwargs.pop("title", "Reactable Menu")
         self.description = kwargs.pop("description", "")
         if self.enabled:
-            self.description = self.description.replace(DISABLED_STRING, "")
+            self.title = self.title.replace(DISABLED_STRING, "")
         else:
-            if DISABLED_STRING not in self.description:
-                self.description += DISABLED_STRING
+            if DISABLED_STRING not in self.title:
+                self.title += DISABLED_STRING
         self.colour = discord.Colour.green() if self.enabled else discord.Colour.red()
         self.show_ids = show_ids
         self.auto_enable = auto_enable
@@ -153,10 +153,10 @@ class ReactableMenu:
 
     async def update_visuals(self):
         if self.enabled:
-            self.description = self.description.replace(DISABLED_STRING, "")
+            self.title = self.title.replace(DISABLED_STRING, "")
             self.colour = discord.Colour.green()
         else:
-            self.description = self.description + DISABLED_STRING
+            self.title = self.title + DISABLED_STRING
             self.colour = discord.Colour.red()
         await self.update_message()
 
