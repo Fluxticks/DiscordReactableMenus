@@ -57,6 +57,17 @@ class ReactableMenu:
             self.embed.add_field(name=emoji, value=descriptor, inline=False)
         return self.embed
 
+    def update_embed(self, **kwargs) -> Embed:
+        old_data = self.embed.to_dict()
+        for arg in kwargs:
+            old_data[arg] = kwargs.get(arg)
+        self.embed = Embed.from_dict(old_data)
+        return self.embed
+
+    async def update_message(self):
+        self.generate_embed()
+        await self.message.edit(embed=self.embed)
+
     def to_dict(self) -> Dict:
         pass
 
