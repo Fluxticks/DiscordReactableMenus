@@ -1,6 +1,6 @@
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Union
 
-from discord import Embed, Message, Emoji, TextChannel
+from discord import Embed, Message, Emoji, PartialEmoji, TextChannel
 
 
 class ReactableMenu:
@@ -26,6 +26,20 @@ class ReactableMenu:
 
     def __repr__(self):
         return repr(self.options)
+
+    def __contains__(self, item):
+        return self.__getitem__(item) is not None
+
+    def __getitem__(self, item: Union[Emoji, PartialEmoji]):
+        if isinstance(item, Emoji):
+            return self.options.get(item)
+        elif isinstance(item, PartialEmoji):
+            emoji_id = item.id
+            for emoji in self.options:
+                if emoji.id == emoji_id:
+                    return self.options.get(emoji)
+
+        return None
 
     def add_option(self, emoji: Emoji, descriptor: Any) -> bool:
         if emoji in self.options:
