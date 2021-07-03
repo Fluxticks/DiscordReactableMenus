@@ -141,23 +141,27 @@ class ReactableMenu:
         self.embed = Embed.from_dict(old_data)
         return self.embed
 
-    def enable_menu(self, bot):
+    def enable_menu(self, bot) -> bool:
         if not self.enabled:
             self.enabled = True
             bot.add_listener(self.on_react_add, "on_raw_reaction_add")
             bot.add_listener(self.on_react_remove, "on_raw_reaction_remove")
+            return True
+        return False
 
-    def disable_menu(self, bot):
+    def disable_menu(self, bot) -> bool:
         if self.enabled:
             self.enabled = False
             bot.remove_listener(self.on_react_add, "on_raw_reaction_add")
             bot.remove_listener(self.on_react_remove, "on_raw_reaction_remove")
+            return True
+        return False
 
-    def toggle_menu(self, bot):
+    def toggle_menu(self, bot) -> bool:
         if not self.enabled:
-            self.enable_menu(bot)
+            return self.enable_menu(bot)
         else:
-            self.disable_menu(bot)
+            return self.disable_menu(bot)
 
     async def finalise_and_send(self, bot, channel: TextChannel):
         self.generate_embed()
