@@ -91,14 +91,16 @@ class ReactableMenu:
         return self.embed
 
     def enable_menu(self, bot):
-        self.enabled = True
-        bot.add_listener(self.on_react_add, "on_raw_reaction_add")
-        bot.add_listener(self.on_react_remove, "on_raw_reaction_remove")
+        if not self.enabled:
+            self.enabled = True
+            bot.add_listener(self.on_react_add, "on_raw_reaction_add")
+            bot.add_listener(self.on_react_remove, "on_raw_reaction_remove")
 
     def disable_menu(self, bot):
-        self.enabled = False
-        bot.remove_listener(self.on_react_add, "on_raw_reaction_add")
-        bot.remove_listener(self.on_react_remove, "on_raw_reaction_remove")
+        if self.enabled:
+            self.enabled = False
+            bot.remove_listener(self.on_react_add, "on_raw_reaction_add")
+            bot.remove_listener(self.on_react_remove, "on_raw_reaction_remove")
 
     def toggle_menu(self, bot):
         if not self.enabled:
