@@ -5,7 +5,7 @@ from discord import Embed, Message, Emoji
 
 class ReactableMenu:
 
-    def __init__(self, add_func=None, remove_func=None, **kwargs):
+    def __init__(self, add_func=None, remove_func=None, show_ids=True, **kwargs):
         self.react_add_func = add_func
         self.react_remove_func = remove_func
         self.id = None
@@ -13,6 +13,7 @@ class ReactableMenu:
         self.embed = Embed(**kwargs)
         self.options = {}
         self.enabled = False
+        self.show_ids = show_ids
 
     def __str__(self) -> str:
         if self.embed is None:
@@ -55,7 +56,12 @@ class ReactableMenu:
             raise ValueError("There is no embed to create!")
         for emoji, descriptor in self.options.items():
             self.embed.add_field(name=emoji, value=descriptor, inline=False)
+
         return self.embed
+
+    def add_footer(self):
+        if self.show_ids and self.id:
+            self.embed.set_footer(text=f"Menu message id: {self.id}")
 
     def update_embed(self, **kwargs) -> Embed:
         old_data = self.embed.to_dict()
@@ -67,6 +73,8 @@ class ReactableMenu:
     async def finalise_and_send(self, message: Message):
         self.generate_embed()
         await self.send_to_context(message)
+        self.add_footer()
+        await self.message.edit(embed=self.embed)
         await self.add_reactions(self.message)
         self.enabled = True
 
