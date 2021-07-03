@@ -1,7 +1,6 @@
 from typing import Dict, List
 
-from discord import Embed, Message
-from discord.ext.commands import Context
+from discord import Embed, Message, Emoji
 
 
 class ReactableMenu:
@@ -20,29 +19,29 @@ class ReactableMenu:
             return ""
         __str = f"Title:{self.embed.title} | Description: {self.embed.description}"
         for emoji, descriptor in self.options.items():
-            __str += f"Emoji: {emoji} | Descriptor: {descriptor}\n"
+            __str += f"\nEmoji: {emoji.name} | Descriptor: {descriptor}"
         return __str
 
     def __repr__(self):
         return repr(self.options)
 
-    def add_option(self, emoji: str, descriptor: str) -> bool:
+    def add_option(self, emoji: Emoji, descriptor: str) -> bool:
         if emoji in self.options:
             return False
 
         self.options[emoji] = descriptor
 
-    def remove_option(self, emoji: str) -> bool:
+    def remove_option(self, emoji: Emoji) -> bool:
         return self.options.pop(emoji, None) is not None
 
-    def add_many(self, options: Dict[str, str]) -> List[Dict[str, str]]:
+    def add_many(self, options: Dict[Emoji, str]) -> List[Dict[Emoji, str]]:
         failed = []
         for emoji, descriptor in options.items():
             if not self.add_option(emoji, descriptor):
                 failed.append({emoji: descriptor})
         return failed
 
-    def remove_many(self, emojis: List[str]) -> List[str]:
+    def remove_many(self, emojis: List[Emoji]) -> List[Emoji]:
         failed = []
         for emoji in emojis:
             if not self.remove_option(emoji):
@@ -64,17 +63,29 @@ class ReactableMenu:
     def from_dict(self, data: Dict):
         pass
 
-    async def send_to_context(self, context: Context) -> Message:
-        self.message: Message = await context.send(embed=self)
+    async def send_to_context(self, message: Message) -> Message:
+        self.message: Message = await message.channel.send(embed=self.embed)
         self.id = self.message.id
+        await self.add_reactions(self.message)
+        self.enabled = True
         return self.message
 
-    def on_react(self, payload):
-        if self.react_add_func:
+    async def add_reactions(self, message: Message = None):
+        if message is None:
+            message = self.message
+
+        if message is None:
+            raise ValueError("There is no message to add reactions to")
+
+        for emoji in self.options:
+            await message.add_reaction(emoji)
+
+    async def on_react(self, payload):
+        if self.react_add_func and self.enabled and payload.message_id == self.id:
             return self.react_add_func(payload)
         return None
 
-    def on_react_remove(self, payload):
-        if self.react_remove_func:
+    async def on_react_remove(self, payload):
+        if self.react_remove_func and self.enabled and payload.message_id == self.id:
             return self.react_remove_func(payload)
         return None
