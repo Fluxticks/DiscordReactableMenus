@@ -1,4 +1,5 @@
 import ast
+from abc import abstractmethod
 from typing import Dict, List, Any, Union
 
 from discord import Embed, Message, Emoji, PartialEmoji, TextChannel
@@ -9,11 +10,11 @@ class ReactableMenu:
     def __init__(self, add_func=None, remove_func=None, show_ids=True, auto_enable=False, **kwargs):
         self.react_add_func = add_func
         self.react_remove_func = remove_func
-        self.id = None
-        self.message = None
-        self.embed = Embed(**kwargs)
-        self.options = {}
-        self.enabled = False
+        self.id = kwargs.pop("id", None)
+        self.message = kwargs.pop("message", None)
+        self.options = kwargs.pop("options", {})
+        self.enabled = kwargs.pop("enabled", False)
+        self.embed = kwargs.pop("embed", Embed(**kwargs))
         self.show_ids = show_ids
         self.auto_enable = auto_enable
 
@@ -41,6 +42,39 @@ class ReactableMenu:
                     return self.options.get(emoji)
 
         return None
+
+    def to_dict(self):
+        data = {
+                "id": self.id,
+                "guild_id": self.message.guild.id,
+                "channel_id": self.message.channel.id,
+                "options": self.serialize_options(),
+                "enabled": self.enabled,
+                "show_ids": self.show_ids
+        }
+        return data
+
+    def serialize_options(self):
+        data = {}
+        for option in self.options:
+            data[option.id] = {"descriptor": self.options.get(option)}
+        return data
+
+    @staticmethod
+    def deserialize_options(bot, options) -> Dict[Emoji, Any]:
+        data = {}
+        if isinstance(options, str):
+            options = ast.literal_eval(options)
+        for option in options:
+            emoji = bot.get_emoji(option)
+            descriptor = options.get("descriptor")
+            data[emoji] = descriptor
+        return data
+
+    @classmethod
+    @abstractmethod
+    async def from_dict(cls, bot, data):
+        pass
 
     def add_option(self, emoji: Emoji, descriptor: Any) -> bool:
         if emoji in self.options:
