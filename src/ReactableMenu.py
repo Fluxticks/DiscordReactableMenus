@@ -2,7 +2,10 @@ import ast
 from abc import abstractmethod
 from typing import Dict, List, Any, Union
 
+import discord
 from discord import Embed, Message, Emoji, PartialEmoji, TextChannel
+
+DISABLED_STRING = "\n*Currently Disabled*"
 
 
 class ReactableMenu:
@@ -14,14 +17,20 @@ class ReactableMenu:
         self.message = kwargs.pop("message", None)
         self.options = kwargs.pop("options", {})
         self.enabled = kwargs.pop("enabled", False)
-        self.embed = kwargs.pop("embed", Embed(**kwargs))
+        self.use_inline = kwargs.pop("use_inline", False)
+        self.title = kwargs.pop("title", "Reactable Menu")
+        self.description = kwargs.pop("description", "")
+        if self.enabled:
+            self.description = self.description.replace(DISABLED_STRING, "")
+        else:
+            if DISABLED_STRING not in self.description:
+                self.description += DISABLED_STRING
+        self.colour = discord.Colour.green() if self.enabled else discord.Colour.red()
         self.show_ids = show_ids
         self.auto_enable = auto_enable
 
     def __str__(self) -> str:
-        if self.embed is None:
-            return ""
-        __str = f"Title:{self.embed.title} | Description: {self.embed.description}"
+        __str = f"Title:{self.title} | Description: {self.description}"
         for emoji, descriptor in self.options.items():
             __str += f"\nEmoji: {emoji.name} | Descriptor: {descriptor}"
         return __str
@@ -85,7 +94,9 @@ class ReactableMenu:
         if not kwargs["message"].embeds:
             raise ValueError("The message for this reaction menu has no menu in it!")
 
-        kwargs["embed"] = kwargs["message"].embeds[0]
+        embed = kwargs["message"].embeds[0]
+        kwargs["description"] = embed.description
+        kwargs["title"] = embed.title
         kwargs["options"] = cls.deserialize_options(bot, data.get("options"))
         kwargs["enabled"] = bool(data.get("enabled"))
         kwargs["show_ids"] = bool(data.get("show_ids"))
@@ -117,34 +128,34 @@ class ReactableMenu:
         return failed
 
     def generate_embed(self) -> Embed:
-        if self.embed is not None:
-            self.embed = Embed(title=self.embed.title, description=self.embed.description)
-        else:
-            raise ValueError("There is no embed to create!")
+        embed = Embed(title=self.title, description=self.description, colour=self.colour)
         for emoji, descriptor in self.options.items():
-            self.embed.add_field(name=emoji, value=descriptor, inline=False)
+            embed.add_field(name=emoji, value=descriptor, inline=self.use_inline)
 
-        return self.embed
+        return embed
 
-    def add_footer(self):
+    def add_footer(self, embed):
         if self.show_ids and self.id:
-            self.embed.set_footer(text=f"Menu message id: {self.id}")
+            embed.set_footer(text=f"Menu message id: {self.id}")
 
-    def remove_footer(self):
-        if self.embed.footer:
-            self.embed.set_footer()
+    @staticmethod
+    def remove_footer(embed):
+        if embed.footer:
+            embed.set_footer()
 
-    def update_embed(self, **kwargs) -> Embed:
-        old_data = self.embed.to_dict()
-        for arg in kwargs:
-            old_data[arg] = kwargs.get(arg)
-        self.embed = Embed.from_dict(old_data)
-        return self.embed
+    async def update_visuals(self):
+        if self.enabled:
+            self.description = self.description.replace(DISABLED_STRING, "")
+            self.colour = discord.Colour.green()
+        else:
+            self.description = self.description + DISABLED_STRING
+            self.colour = discord.Colour.red()
+        await self.update_message()
 
     async def enable_menu(self, bot) -> bool:
         if not self.enabled:
-            await self.add_reactions(self.message)
             self.enabled = True
+            await self.update_visuals()
             bot.add_listener(self.on_react_add, "on_raw_reaction_add")
             bot.add_listener(self.on_react_remove, "on_raw_reaction_remove")
             return True
@@ -154,33 +165,36 @@ class ReactableMenu:
         if self.enabled:
             await self.message.clear_reactions()
             self.enabled = False
+            await self.update_visuals()
             bot.remove_listener(self.on_react_add, "on_raw_reaction_add")
             bot.remove_listener(self.on_react_remove, "on_raw_reaction_remove")
             return True
         return False
 
-    def toggle_menu(self, bot) -> bool:
+    async def toggle_menu(self, bot) -> bool:
         if not self.enabled:
             return await self.enable_menu(bot)
         else:
             return await self.disable_menu(bot)
 
     async def finalise_and_send(self, bot, channel: TextChannel):
-        self.generate_embed()
-        await self.send_to_channel(channel)
-        self.add_footer()
-        await self.message.edit(embed=self.embed)
-        await self.add_reactions(self.message)
+        embed = self.generate_embed()
+        self.add_footer(embed)
+        await self.send_to_channel(channel, embed)
+        await self.message.edit(embed=embed)
         if self.auto_enable:
             await self.enable_menu(bot)
 
     async def update_message(self):
-        self.generate_embed()
-        await self.message.edit(embed=self.embed)
-        await self.add_reactions()
+        embed = self.generate_embed()
+        await self.message.edit(embed=embed)
+        if self.enabled:
+            await self.add_reactions()
 
-    async def send_to_channel(self, channel: TextChannel) -> Message:
-        self.message: Message = await channel.send(embed=self.embed)
+    async def send_to_channel(self, channel: TextChannel, embed: Embed = None) -> Message:
+        if embed is None:
+            embed = self.generate_embed()
+        self.message: Message = await channel.send(embed=embed)
         self.id = self.message.id
         return self.message
 
