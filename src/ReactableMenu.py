@@ -4,18 +4,21 @@ from discord import Embed, Message
 from discord.ext.commands import Context
 
 
-class ReactableMenu(Embed):
+class ReactableMenu:
 
-    def __init__(self, **kwargs):
-        self.react_add_func = kwargs.pop("add_func", None)
-        self.react_remove_func = kwargs.pop("remove_func", None)
-        super().__init__(**kwargs)
+    def __init__(self, add_func=None, remove_func=None, **kwargs):
+        self.react_add_func = add_func
+        self.react_remove_func = remove_func
         self.id = None
         self.message = None
+        self.embed = Embed(**kwargs)
         self.options = {}
+        self.enabled = False
 
     def __str__(self) -> str:
-        __str = ""
+        if self.embed is None:
+            return ""
+        __str = f"Title:{self.embed.title} | Description: {self.embed.description}"
         for emoji, descriptor in self.options.items():
             __str += f"Emoji: {emoji} | Descriptor: {descriptor}\n"
         return __str
@@ -47,9 +50,13 @@ class ReactableMenu(Embed):
         return failed
 
     def generate_embed(self) -> Embed:
-        for emoji, descriptor in self.options:
-            self.add_field(name=emoji, value=descriptor, inline=False)
-        return self
+        if self.embed is not None:
+            self.embed = Embed(title=self.embed.title, description=self.embed.description)
+        else:
+            raise ValueError("There is no embed to create!")
+        for emoji, descriptor in self.options.items():
+            self.embed.add_field(name=emoji, value=descriptor, inline=False)
+        return self.embed
 
     def to_dict(self) -> Dict:
         pass
