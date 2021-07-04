@@ -151,11 +151,15 @@ class PollReactMenu(ReactableMenu):
         max_length = self.get_longest_option()
         winner_ids, winner_votes = self.get_winner()
         winner_strings = "\n".join(self.make_bar(x, max_length, winner_votes, is_winner=True) for x in winner_ids)
+        remaining_options = self.votes.copy()
         for winner in winner_ids:
-            self.votes.pop(winner)
-        other_strings = "\n".join(self.make_bar(x, max_length, winner_votes) for x in self.votes)
+            remaining_options.pop(winner)
 
-        string = f"```\n{winner_strings}\n{other_strings}```"
+        other_strings = ""
+        for key, _ in sorted(remaining_options.items(), key=lambda x: x[1].get("votes"), reverse=True):
+            other_strings += "\n" + self.make_bar(key, max_length, winner_votes)
+
+        string = f"```\n{winner_strings}{other_strings}```"
         return string
 
     def make_bar(self, emoji_id, longest_descriptor, winning_votes, is_winner=False):
