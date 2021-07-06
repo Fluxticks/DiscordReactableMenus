@@ -86,7 +86,7 @@ class ReactableMenu:
             options = ast.literal_eval(options)
         for option in options:
             option_data = options.get(option)
-            emoji = partial_from_string(option_data.get("emoji"))
+            emoji = PartialEmoji.from_dict(option_data.get("emoji"))
             descriptor = option_data.get("descriptor")
             data[option] = {"emoji": emoji, "descriptor": descriptor}
         return data
