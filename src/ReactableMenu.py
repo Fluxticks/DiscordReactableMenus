@@ -77,6 +77,8 @@ class ReactableMenu:
             self.enabled = False
             await self.enable_menu(bot)
 
+        self._update_reaction_counts()
+
         return True
 
     def set_title(self, new_title: str) -> str:
@@ -273,6 +275,12 @@ class ReactableMenu:
                     # print(str(e))
                     pass
 
+    def _update_reaction_counts(self):
+        for reaction in self.message.reactions:
+            emoji = MultiEmoji(reaction.emoji)
+            if emoji.emoji_id in self.options:
+                self.options.get(emoji.emoji_id).reaction_count = reaction.count
+
     async def update_message(self):
         """
         Update the contents of the message with the current state of the reaction menu.
@@ -414,6 +422,10 @@ class ReactableOption:
     @property
     def reaction_count(self):
         return self._reaction_count
+
+    @reaction_count.setter
+    def reaction_count(self, value):
+        self._reaction_count = value
 
     def get_emoji(self) -> MultiEmoji:
         """
