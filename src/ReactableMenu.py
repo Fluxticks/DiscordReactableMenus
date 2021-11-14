@@ -51,7 +51,7 @@ class ReactableMenu:
                 "description": self.description,
                 "meta": self.meta,
                 "show_id": self.show_id,
-                "auto_enable": self.auto_enable,
+                "enabled": self.enabled,
                 "options": []
                 }
         for option in self.options.values():
