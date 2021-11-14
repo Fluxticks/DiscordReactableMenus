@@ -2,7 +2,7 @@ from typing import Dict, List, Any, Union, Tuple
 from discord import Embed, HTTPException, Role, Colour
 from discord.abc import GuildChannel
 
-from EmojiHandler import MultiEmoji
+from .EmojiHandler import MultiEmoji
 
 DISABLED_STRING = "(Currently Disabled)"
 

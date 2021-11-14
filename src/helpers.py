@@ -1,6 +1,6 @@
 import shlex
 
-from ReactableMenu import ReactableMenu
+from .ReactableMenu import ReactableMenu
 
 
 def get_options(command_name, message_contents):
