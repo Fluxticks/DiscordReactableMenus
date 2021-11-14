@@ -266,13 +266,7 @@ class ReactableMenu:
             for emoji in emojis_missing:
                 try:
                     await self.message.add_reaction(self.options.get(emoji).emoji.discord_emoji)
-                except HTTPException as e:
-                    # print(repr(self.options.get(emoji).emoji.discord_emoji))
-                    # print(str(self.options.get(emoji).emoji.discord_emoji))
-                    # print(repr(self.options.get(emoji).emoji))
-                    # print(str(self.options.get(emoji).emoji))
-                    # print(repr(e))
-                    # print(str(e))
+                except HTTPException:
                     pass
 
     def _update_reaction_counts(self):
@@ -363,7 +357,7 @@ class ReactableMenu:
         if payload is None:
             return None
 
-        if self.enabled and self.react_remove_func and not payload.member.bot and payload.message_id == self.id:
+        if self.enabled and self.react_remove_func and payload.message_id == self.id:
             return await self.react_remove_func(payload)
         return None
 
