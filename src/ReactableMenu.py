@@ -305,8 +305,10 @@ class ReactableMenu:
         if not self.enabled:
             self.enabled = True
             await self.update_message()
-            bot_instance.add_listener(self.on_react_add, "on_raw_reaction_add")
-            bot_instance.add_listener(self.on_react_remove, "on_raw_reaction_remove")
+            if self.react_add_func is not None:
+                bot_instance.add_listener(self.on_react_add, "on_raw_reaction_add")
+            if self.react_remove_func is not None:
+                bot_instance.add_listener(self.on_react_remove, "on_raw_reaction_remove")
 
     async def disable_menu(self, bot_instance):
         """
@@ -319,8 +321,10 @@ class ReactableMenu:
         if self.enabled:
             self.enabled = False
             await self.update_message()
-            bot_instance.remove_listener(self.on_react_add, "on_raw_reaction_add")
-            bot_instance.remove_listener(self.on_react_remove, "on_raw_reaction_remove")
+            if self.react_add_func is not None:
+                bot_instance.remove_listener(self.on_react_add, "on_raw_reaction_add")
+            if self.react_remove_func is not None:
+                bot_instance.remove_listener(self.on_react_remove, "on_raw_reaction_remove")
 
     async def finalise_and_send(self, bot_instance, text_channel):
         """
