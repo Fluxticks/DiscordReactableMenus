@@ -61,4 +61,3 @@ If you have any saved ReactableMenus from v1 of this packaged, the saved states 
 
 ## Contributing
 Any suggestions regarding changes are welcome, so feel free to create a Fork and then create a PR.
-
