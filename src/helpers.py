@@ -65,6 +65,25 @@ def menu_from_options(data, menu_type=ReactableMenu, **kwargs):
     return menu
 
 
+def convert_v1_to_v2(v1_dict):
+    """
+    A function to convert a v1 reaction menu to be compatible with the new v2 implementation. This mostly involves
+    converting the options to work correctly.
+    :param v1_dict: The saved dictionary of a v1 reaction menu.
+    """
+    v2_dict = v1_dict.copy()
+    options = []
+    for option_id in v2_dict.get("options").keys():
+        option = v2_dict.get("options").get(option_id)
+        emoji = option.get("emoji")
+        value = option.get("descriptor")
+        description = option.get("description", None)
+        reaction_count = option.get("reaction_count", 0)
+        options.append({"emoji": emoji, "value": value, "description": description, "reaction_count": reaction_count})
+    v2_dict["options"] = options
+    return v2_dict
+
+
 class InvalidCharacters(Exception):
 
     def __init__(self, attempted_characters, message="The string contained illegal characters"):
