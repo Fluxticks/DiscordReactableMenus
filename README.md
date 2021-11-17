@@ -56,8 +56,5 @@ The ReactableMenu has the following functions that can be overridden for appeara
 
 If you have any saved ReactableMenus from v1 of this packaged, the saved states can be converted to the new v2 implementation using `helpers.convert_v1_to_v2` function, which will output the corresponding v2 dictionary from a v1 dictionary.
 
-## TODOs
-- Re-add example menus with new V2 features.
-
 ## Contributing
 Any suggestions regarding changes are welcome, so feel free to create a Fork and then create a PR.
