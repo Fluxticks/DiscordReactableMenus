@@ -32,11 +32,16 @@ class ReactableMenu:
         :param data: The data of a saved reaction menu.
         """
         menu_options = data.pop("options")
-        data["options"] = {}
-        for option in menu_options:
-            formatted_option = ReactableOption.from_dict(option)
-            data["options"][formatted_option.emoji.emoji_id] = formatted_option
+        data["options"] = cls._parse_options(menu_options)
         return ReactableMenu(**data)
+
+    @staticmethod
+    def _parse_options(options):
+        parsed_options = {}
+        for option in options:
+            formatted_option = ReactableOption.from_dict(option)
+            parsed_options[formatted_option.emoji.emoji_id] = formatted_option
+        return parsed_options
 
     def to_dict(self):
         """
