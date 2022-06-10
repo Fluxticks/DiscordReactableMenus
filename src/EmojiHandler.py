@@ -1,92 +1,82 @@
-from typing import Dict, Union
-
+from typing import Any, Dict, Union
 import emoji
 from discord import PartialEmoji, Emoji
 
 
-def partial_from_emoji(full_emoji: Emoji) -> PartialEmoji:
-    data = {"name": full_emoji.name, "id": full_emoji.id, "animated": full_emoji.animated}
-    return PartialEmoji.from_dict(data)
+def string_to_partial_emoji(string_emoji: str) -> PartialEmoji:
+    string_emoji = string_emoji.strip()
+    converted_emoji = emoji.demojize(string_emoji, use_aliases=True)
+    if converted_emoji == string_emoji:
+        # Emojis should be in the format <a:name:id>
+        if string_emoji.count(":") < 2:
+            return None
+        animated = "<a:" in string_emoji
+        first_colon_index = string_emoji.index(":")
+        last_colon_index = string_emoji.index(":", first_colon_index + 1)
+        emoji_name = string_emoji[first_colon_index + 1 : last_colon_index]
+        emoji_id = string_emoji[last_colon_index + 1 : -1]
+
+        emoji_data = {"name": emoji_name, "id": emoji_id, "animated": animated}
+    else:
+        emoji_data = {"name": string_emoji, "id": None, "animated": False}
+
+    return PartialEmoji.from_dict(emoji_data)
 
 
-def partial_data_from_string(emoji_str: str) -> Dict:
-    emoji_str = emoji_str.strip()
-    converted_emoji = emoji.demojize(emoji_str, use_aliases=True)
-    if converted_emoji != emoji_str:
-        return {"name": emoji_str, "id": None, "animated": False}
-
-    if emoji_str.count(":") < 2:
-        return {}
-
-    animated = "<a:" in emoji_str
-    first_colon_index = emoji_str.index(":")
-    second_colon_index = emoji_str.index(":", first_colon_index + 1)
-
-    name = emoji_str[first_colon_index + 1:second_colon_index]
-    emoji_id = emoji_str[second_colon_index + 1:-1]
-
-    return {"name": name, "id": emoji_id, "animated": animated}
+def emoji_to_partial_emoji(full_emoji: Emoji) -> PartialEmoji:
+    emoji_data = {
+        "name": full_emoji.name,
+        "id": full_emoji.id,
+        "animated": full_emoji.animated,
+    }
+    return PartialEmoji.from_dict(emoji_data)
 
 
-def partial_from_string(emoji_str: str) -> PartialEmoji:
-    data = None
-    if isinstance(emoji_str, str):
-        data = partial_data_from_string(emoji_str)
-
-    if not data:
-        raise ValueError("Unable to form emoji from given string")
-    return PartialEmoji.from_dict(data)
-
-
-class MultiEmoji:
-    def __init__(self, emoji_input: Union[str, dict, Emoji, PartialEmoji, "MultiEmoji"]):
-
+class ReactionEmoji:
+    def __init__(
+        self, emoji_input: Union[PartialEmoji, Emoji, Dict, str, "ReactionEmoji"]
+    ):
         if isinstance(emoji_input, str):
-            self._partial = partial_from_string(emoji_input)
+            self.partial = string_to_partial_emoji(emoji_input)
         elif isinstance(emoji_input, Emoji):
-            self._partial = partial_from_emoji(emoji_input)
+            self.partial = emoji_to_partial_emoji(emoji_input)
         elif isinstance(emoji_input, PartialEmoji):
-            self._partial = emoji_input
-        elif isinstance(emoji_input, MultiEmoji):
-            self._partial = emoji_input._partial
+            self.partial = emoji_input
+        elif isinstance(emoji_input, ReactionEmoji):
+            self.partial = emoji_input.partial
         elif isinstance(emoji_input, dict):
-            self._partial = PartialEmoji.from_dict(emoji_input)
+            self.partial = PartialEmoji.from_dict(emoji_input)
         else:
-            raise ValueError("The given emoji input must of type str, discord.Emoji or discord.PartialEmoji")
+            raise ValueError("Invalid emoji type given!")
 
-        self._name = str(self._partial.name)
-        self._emoji_id = self._partial.id if self._partial.id else self._name
-        self._emoji_id = str(self._emoji_id)
-        self._animated = self._partial.animated
+    @property
+    def name(self) -> str:
+        return self.partial.name
+
+    @property
+    def emoji_id(self) -> str:
+        return str(self.partial.id) if self.partial.id else self.name
+
+    @property
+    def animated(self) -> bool:
+        return self.partial.animated
+
+    @property
+    def discord_emoji(self) -> PartialEmoji:
+        return self.partial
 
     @classmethod
-    def from_dict(cls, data):
-        return MultiEmoji(PartialEmoji.from_dict(data))
+    def from_dict(cls, emoji_data: Dict) -> "ReactionEmoji":
+        return ReactionEmoji(PartialEmoji.from_dict(emoji_data))
 
-    def __str__(self):
+    def to_dict(self) -> Dict:
+        return self.partial.to_dict()
+
+    def __str__(self) -> str:
         return emoji.emojize(self.name, use_aliases=True)
 
-    def __repr__(self):
-        return emoji.demojize(self.name, use_aliases=True)
+    def __repr__(self) -> str:
+        return f"<{'a' if self.animated else ''}:{self.name}:{self.emoji_id}>"
 
-    def __eq__(self, other):
-        return isinstance(other, MultiEmoji) and self._emoji_id == other.emoji_id
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def emoji_id(self):
-        return self._emoji_id
-
-    @property
-    def animated(self):
-        return self._animated
-
-    @property
-    def discord_emoji(self):
-        return self._partial
-
-    def to_dict(self):
-        return self._partial.to_dict()
+    def __eq__(self, __o: Any) -> bool:
+        return isinstance(__o, ReactionEmoji) and self.emoji_id == __o.emoji_id

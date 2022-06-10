@@ -1,470 +1,315 @@
-from typing import Dict, List, Any, Union, Tuple
-from discord import Embed, HTTPException, Role, Colour
+from typing import Any, Callable, Dict, Tuple, Union
+from discord import (
+    Emoji,
+    Interaction,
+    Message,
+    PartialEmoji,
+    Role,
+    Color,
+    Embed,
+    ButtonStyle,
+)
+from discord.ui import View, Button
 from discord.abc import GuildChannel
+from discord.ext import commands
 
-from .EmojiHandler import MultiEmoji
-
-DISABLED_STRING = "(Currently Disabled)"
+from src.EmojiHandler import ReactionEmoji
 
 
 class ReactableMenu:
+    def __init__(
+        self,
+        title: str,
+        title_disabled_suffix: str = "Disabled",
+        description: str = "",
+        description_meta: str = "",
+        options: Dict = {},
+        enabled_color: Color = Color.green(),
+        disabled_color: Color = Color.red(),
+        message_id: int = None,
+        message: Message = None,
+        view: View = None,
+        on_button_click: Callable = None,
+        use_inline: bool = False,
+        show_id: bool = False,
+        auto_enable: bool = False,
+        **kwargs,
+    ):
+        self.title = title
+        self.title_disabled_suffix = title_disabled_suffix
+        self.description = description
+        self.description_meta = description_meta
+        self.enabled_color = enabled_color
+        self.disabled_color = disabled_color
+        self.options = options
 
-    def __init__(self, **kwargs):
-        self.react_add_func = kwargs.pop("add_func", None)
-        self.react_remove_func = kwargs.pop("remove_func", None)
-        self.id = kwargs.pop("id", None)
-        self._channel_id = kwargs.pop("channel_id", None)
-        self.message = kwargs.pop("message", None)
-        self.options = kwargs.pop("options", {})
-        self.enabled = kwargs.pop("enabled", False)
-        self.use_inline = kwargs.pop("use_inline", False)
-        self.title = kwargs.pop("title", "Reaction Menu")
-        self.disabled_string = kwargs.pop("disabled_string", DISABLED_STRING)
-        self.description = kwargs.pop("description", "")
-        self.meta = kwargs.pop("meta", "")
-        self.show_id = kwargs.pop("show_id", False)
-        self.auto_enable = kwargs.pop("auto_enable", False)
+        self.message = message
+        self.message_id = message_id
+        self.view = view
+        if self.message is not None:
+            self.channel = message.channel
+            self.guild = message.channel.guild
+
+            self.channel_id = self.channel.id
+            self.guild_id = self.guild.id
+        else:
+            self.channel = None
+            self.guild = None
+
+            self.channel_id = None
+            self.guild_id = None
+
+        self.on_button_click = on_button_click
+
+        self.use_inline = use_inline
+        self.show_id = show_id
+        self.auto_enable = auto_enable
+        self.enabled = False
 
     @classmethod
-    def from_dict(cls, data: Dict):
-        """
-        Creates a new reaction menu from a dictionary of data.
-        :param data: The data of a saved reaction menu.
-        """
-        menu_options = data.pop("options")
-        data["options"] = cls._parse_options(menu_options)
+    def from_dict(cls, data: Dict) -> "ReactableMenu":
+        options_list = [MenuOption(x) for x in data.get("options", [])]
+        data["options"] = {x.id: x for x in options_list}
+        if data.get("enabled_color"):
+            data["enabled_color"] = Color(int(data.get("enabled_color")))
+        if data.get("disabled_color"):
+            data["disabled_color"] = Color(int(data.get("disabled_color")))
         return ReactableMenu(**data)
 
-    @staticmethod
-    def _parse_options(options):
-        parsed_options = {}
-        for option in options:
-            formatted_option = ReactableOption.from_dict(option)
-            parsed_options[formatted_option.emoji.emoji_id] = formatted_option
-        return parsed_options
-
-    def to_dict(self):
-        """
-        Gets the current state of the reaction menu and creates a dictionary that can be saved to a file or database.
-        :return: A dictionary of the current state of the reaction menu.
-        """
-        data = {"id": self.id,
-                "channel_id": self._channel_id,
-                "use_inline": self.use_inline,
-                "title": self.title,
-                "disabled_string": self.disabled_string,
-                "description": self.description,
-                "meta": self.meta,
-                "show_id": self.show_id,
-                "enabled": self.enabled,
-                "options": []
-                }
-        for option in self.options.values():
-            data["options"].append(option.to_dict())
+    def to_dict(self) -> Dict:
+        options = [x.to_dict() for x in self.options.values()]
+        data = {
+            "title": self.title,
+            "title_disabled_suffix": self.title_disabled_suffix,
+            "description": self.description,
+            "description_meta": self.description_meta,
+            "enabled_color": self.enabled_color.value,
+            "disabled_color": self.disabled_color.value,
+            "use_inline": self.use_inline,
+            "show_id": self.show_id,
+            "enabled": self.enabled,
+            "options": options,
+        }
         return data
 
-    async def initialise(self, bot):
-        """
-        Initialises the reaction menu. This will grab the latest instance of the reaction menu message and any other
-        attributes which require the bot to be ready. Will return True if the message exists and the initialisation was
-        successful, otherwise False.
-        :param bot: The instance of the bot to use to access the API.
-        :return: True if successful, False otherwise.
-        """
-        if self.id is None or self._channel_id is None:
+    @property
+    def id(self) -> int:
+        return self.message_id if self.message_id else self.message.id
+
+    def add_option(
+        self, given_emoji: Union[PartialEmoji, Emoji, str], description: Any
+    ) -> bool:
+        try:
+            emoji = ReactionEmoji(given_emoji)
+
+            if emoji.emoji_id in self.options:
+                return False
+
+            self.options[emoji.emoji_id] = MenuOption(emoji, description)
+            return True
+        except ValueError:
             return False
 
-        self.message = await (await bot.fetch_channel(self._channel_id)).fetch_message(self.id)
-        if self.message is None:
+    def remove_option(self, given_emoji: Union[PartialEmoji, Emoji, str]) -> bool:
+        try:
+            emoji = ReactionEmoji(given_emoji)
+            return self.options.pop(emoji.emoji_id, None) is not None
+        except ValueError:
             return False
 
-        if self.auto_enable:
-            self.enabled = False
-            await self.enable_menu(bot)
-
-        self._update_reaction_counts()
-
-        return True
-
-    def set_title(self, new_title: str) -> str:
-        """
-        Set the title attribute of a reaction menu.
-        :param new_title: The new title to set.
-        :return: The title after the update.
-        """
-        self.title = new_title
-        return self.title
-
-    def set_description(self, new_description: str) -> str:
-        """
-        Sets the description attribute of a reaction menu. This is not the description attribute of the embed.
-        :param new_description: The new description to set.
-        :return: The description attribute after the update.
-        """
-        self.description = new_description
-        return self.description
-
-    def set_meta(self, new_meta: str) -> str:
-        """
-        Sets the meta attribute of a reaction menu.
-        :param new_meta: The new meta to set.
-        :return: The meta attribute after the update.
-        """
-        self.meta = new_meta
-        return self.meta
-
-    def generate_title(self) -> str:
-        """
-        Generate the string used in the title of the embed message.
-        :return: A string representing the title of the embed message.
-        """
-        if self.enabled:
-            return self.title
-        else:
-            return f"{self.title} {self.disabled_string}"
-
-    def generate_description(self) -> str:
-        """
-        Generate the description string used in the description arg of the embed message.
-        :return: A string representing the description of the embed message.
-        """
-        result = ""
-        if self.description:
-            result += self.description
-
-        if self.meta:
-            result += "\n" + self.meta
-
-        return result
-
-    @staticmethod
-    def generate_option_field(option: "ReactableOption") -> Tuple[str, str]:
-        """
-        Generate the name and value strings of a field to be added to the embed.
-        :param option: The option to use the data of to format the string.
-        :return: A tuple of strings of name, value representing the strings of a field in the embed message.
-        """
-        name = "​"
-        value = str(option)
-        return name, value
-
-    def generate_colour(self) -> Colour:
-        """
-        Generate the colour used to colour the embed message.
-        :return: A discord colour of the embed message.
-        """
-        if self.enabled:
-            return Colour.green()
-        else:
-            return Colour.red()
-
-    def generate_footer_text(self) -> str:
-        """
-        Generate the string used to set the footer of the embed message.
-        :return: A string representing the footer of the embed message.
-        """
-        return f"Message ID: {self.id}"
-
-    def generate_embed(self) -> Embed:
-        """
-        Generate the embed object representing this ReactableMenu using the generators of each of the sections of the
-        embed to populate its fields.
-        :return: An embed object representing this ReactableMenu
-        """
+    def build_embed(self) -> Embed:
         title = self.generate_title()
         description = self.generate_description()
-        colour = self.generate_colour()
+        color = self.get_current_color()
 
-        embed = Embed(title=title, description=description, colour=colour)
+        embed = Embed(title=title, description=description, color=color)
 
-        for option in self.options:
-            name, value = self.generate_option_field(self.options.get(option))
-            embed.add_field(name=name, value=value, inline=self.use_inline)
+        for option in self.options.values():
+            name, description = self.generate_option_field(option)
+            embed.add_field(name=name, value=description, inline=self.use_inline)
 
         if self.show_id:
             embed.set_footer(text=self.generate_footer_text())
 
         return embed
 
-    def __contains__(self, item: Any) -> bool:
-        return self.__getitem__(item) is not None
-
-    def __getitem__(self, item: Any) -> Union["ReactableOption", Any]:
-        try:
-            p_emoji = MultiEmoji(item)
-            return self.options.get(p_emoji.emoji_id)
-        except ValueError:
-            return None
-
-    def add_option(self, emoji: Any, value: Union[Role, str]) -> bool:
-        """
-        Adds a single option to the reaction menu.
-        :param emoji: The emoji of the option. Cannot already exist as an option.
-        :param value: The value associated with the emoji. Eg a string or Role.
-        :return: A boolean of if the option was added to the reaction menu.
-        """
-        try:
-            formatted_emoji = MultiEmoji(emoji)
-
-            if formatted_emoji in self:
-                return False
-
-            self.options[formatted_emoji.emoji_id] = ReactableOption(formatted_emoji, value)
-            return True
-        except ValueError:
-            return False
-
-    def add_many(self, options: List[Tuple[MultiEmoji, Any]]) -> bool:
-        """
-        Adds multiple options to a reaction menu.
-        :param options: The list of tuple of Emoji, Value pairs to add.
-        :return: A boolean of if all the options were added.
-        """
-        total_success = True
-        for emoji, value in options:
-            total_success = total_success and self.add_option(emoji, value)
-        return total_success
-
-    def remove_option(self, emoji: Any) -> bool:
-        """
-        Removes a single option from the reaction menu.
-        :param emoji: The emoji of the option to remove.
-        :return: A boolean of if the option with the given emoji was removed.
-        """
-        try:
-            formatted_emoji = MultiEmoji(emoji)
-            return self.options.pop(formatted_emoji.emoji_id, None) is not None
-        except ValueError:
-            return False
-
-    def remove_many(self, options: List) -> bool:
-        """
-        Remove more than one option from the reaction menu.
-        :param options: The list of emojis to remove the options of.
-        :return: A boolean of if all the removals were successful.
-        """
-        total_success = True
-        for option in options:
-            total_success = total_success and self.remove_option(option)
-        return total_success
-
-    async def update_reactions(self):
-        """
-        Updates the reactions on the message. If the reaction menu is disabled, remove all reactions.
-        If the reaction menu is enabled, ensure that only valid options are reactions in the message, and add any
-        missing options as reactions.
-        """
-        if not self.message:
-            raise ValueError(f"Unable to add reactions to '{self.message}' message")
-
-        if not self.enabled:
-            await self.message.clear_reactions()
+    def build_view(self, is_persistent: bool = False, timeout: int = 180) -> View:
+        if is_persistent:
+            self.view = View(timeout=None)
         else:
-            emojis_missing = list(self.options.keys())
-            for reaction in self.message.reactions:
-                emoji = MultiEmoji(reaction.emoji)
-                if emoji.emoji_id in emojis_missing:
-                    emojis_missing.remove(emoji.emoji_id)
-                else:
-                    await reaction.clear()
-
-            for emoji in emojis_missing:
-                try:
-                    await self.message.add_reaction(self.options.get(emoji).emoji.discord_emoji)
-                except HTTPException:
-                    pass
-
-    def _update_reaction_counts(self):
-        for reaction in self.message.reactions:
-            emoji = MultiEmoji(reaction.emoji)
-            if emoji.emoji_id in self.options:
-                self.options.get(emoji.emoji_id).reaction_count = reaction.count
-
-    async def update_message(self):
-        """
-        Update the contents of the message with the current state of the reaction menu.
-        """
-        if not self.message:
-            raise ValueError(f"Unable to update message of type '{self.message}'")
-
-        new_embed = self.generate_embed()
-        await self.message.edit(embed=new_embed)
-        self.message = await self.message.channel.fetch_message(self.id)
-        await self.update_reactions()
-
-    async def enable_menu(self, bot_instance):
-        """
-        Enables a reaction menu. This removes the adds the appropriate event listeners for on_react_add and
-        on_react_remove, as well as ensures that only the emojis for valid options are reactions to the message.
-        :param bot_instance: The instance of the bot running.
-        """
-        if not self.message:
-            raise ValueError(f"Unable to enable reaction menu with message of '{self.message}'")
-
-        if not self.enabled:
-            self.enabled = True
-            await self.update_message()
-            if self.react_add_func is not None:
-                bot_instance.add_listener(self.on_react_add, "on_raw_reaction_add")
-            if self.react_remove_func is not None:
-                bot_instance.add_listener(self.on_react_remove, "on_raw_reaction_remove")
-
-    async def disable_menu(self, bot_instance):
-        """
-        Disables a reaction menu. This removes the listeners for on_react_add and on_react_remove.
-        :param bot_instance: The instance of the bot running.
-        """
-        if not self.message:
-            raise ValueError(f"Unable to disable reaction menu with message of '{self.message}'")
+            self.view = View(timeout=timeout)
 
         if self.enabled:
-            self.enabled = False
-            await self.update_message()
-            if self.react_add_func is not None:
-                bot_instance.remove_listener(self.on_react_add, "on_raw_reaction_add")
-            if self.react_remove_func is not None:
-                bot_instance.remove_listener(self.on_react_remove, "on_raw_reaction_remove")
+            self.view.add_item(
+                Button(
+                    label="",
+                    emoji="⏹️",
+                    custom_id=f"disable_{self.message_id}",
+                    style=ButtonStyle.red,
+                )
+            )
 
-    async def finalise_and_send(self, bot_instance, text_channel):
-        """
-        Create the embed for the current state of the reaction menu and send the message.
-        :param bot_instance: The instance of the bot running.
-        :param text_channel: The text channel to send the message to.
-        """
-        self.message = await text_channel.send(content="​")
-        self.id = self.message.id
-        self._channel_id = text_channel.id
-        if self.auto_enable:
-            await self.enable_menu(bot_instance)
+            for emoji_id, option in self.options.items():
+                self.view.add_item(
+                    Button(
+                        label=option.label,
+                        emoji=option.emoji,
+                        custom_id=f"{emoji_id}_{self.message_id}",
+                    )
+                )
         else:
-            self.enabled = True  # self.enabled must be first set to True so that self.disable_menu runs as intended.
-            await self.disable_menu(bot_instance)
+            self.view.add_item(
+                Button(
+                    label="",
+                    emoji="▶️",
+                    custom_id=f"enable_{self.message_id}",
+                    style=ButtonStyle.green,
+                )
+            )
 
-    async def on_react_add(self, payload) -> Any:
-        """
-        The function that runs when a reaction is added to any message.
-        :param payload: The payload of the raw reaction event.
-        :return: None if the reaction is invalid or not for this reaction menu, or the result of self.react_add_func.
-        """
-        if payload is None:
-            return None
+        for item in self.view.children:
+            item.callback = self.on_interaction_handler
 
-        if self.enabled and self.react_add_func and not payload.member.bot and payload.message_id == self.id:
-            return await self.react_add_func(payload)
-        return None
+        return self.view
 
-    async def on_react_remove(self, payload) -> Any:
-        """
-        The function that runs when a reaction is removed from any message.
-        :param payload: The payload of the raw reaction event.
-        :return: None if the reaction is invalid or not for this reaction menu, or the result of self.react_remove_func.
-        """
-        if payload is None:
-            return None
+    def generate_title(self) -> str:
+        suffix = f" ({self.title_disabled_suffix})" if not self.enabled else ""
+        return f"{self.title}{suffix}"
 
-        if self.enabled and self.react_remove_func and payload.message_id == self.id:
-            return await self.react_remove_func(payload)
-        return None
+    def generate_description(self) -> str:
+        description = ""
+
+        if self.description:
+            description += self.description
+
+        if self.description_meta:
+            description += f"\n{self.description_meta}"
+
+        return description
+
+    def get_current_color(self) -> Color:
+        return self.enabled_color if self.enabled else self.disabled_color
+
+    def generate_option_field(self, option: "MenuOption") -> Tuple[str, str]:
+        name = "​"
+        value = str(option)
+        return name, value
+
+    def generate_footer_text(self) -> str:
+        return f"Menu ID: {self.message_id}"
+
+    async def enable(self) -> None:
+        if not self.enabled:
+            self.enabled = True
+            if not self.message:
+                raise ValueError("ReactionMenu cannot be enabled before it is sent")
+            await self.message.edit(embed=self.build_embed(), view=self.build_view())
+
+    async def disable(self) -> None:
+        if self.enabled:
+            self.enabled = False
+            if not self.message:
+                return None
+            await self.message.edit(embed=self.build_embed(), view=self.build_view())
+
+    async def on_interaction_handler(self, interaction: Interaction) -> bool:
+        if interaction is None:
+            # Ignore empty interactions
+            return False
+
+        if interaction.message.id != self.message_id:
+            # Interactions that belong to other messages will be handled by other menus/cogs
+            return False
+
+        interaction_id = interaction.data.get("custom_id")
+
+        # The enable/disable buttons need to be handled seperately from the rest of the menu
+        if "enable" in interaction_id:
+            await self.enable()
+            await interaction.response.send_message("Menu enabled!", ephemeral=True)
+            return True
+        elif "disable" in interaction_id:
+            await self.disable()
+            await interaction.response.send_message("Menu disabled!", ephemeral=True)
+            return True
+
+        if self.enabled:
+            try:
+                await self.on_button_click(self, interaction)
+                return True
+            except:
+                await interaction.response.send_message(
+                    "There was an error handling your interaction, please contact a developer",
+                    ephemeral=True,
+                )
+        else:
+            await interaction.response.send_message(
+                content="This menu is currently disabled!", ephemeral=True
+            )
+        return False
+
+    async def send_menu(self, context: commands.Context) -> Message:
+        # Send a temporary message so that we have an exisiting message object to reference
+        self.message = await context.send("_Building reaction menu..._")
+        self.message_id = self.message.id
+        self.enabled = self.auto_enable
+
+        await self.message.edit(
+            content="​", embed=self.build_embed(), view=self.build_view()
+        )
+        return self.message
 
 
-class ReactableOption:
-
-    def __init__(self, emoji: MultiEmoji, value: Any, description=None, reaction_count=0):
+class MenuOption:
+    def __init__(self, emoji: ReactionEmoji, description: Any, reaction_count: int = 0):
         self._emoji = emoji
-        self._value = self._format_value(value)
+        self.reaction_count = reaction_count
         self._description = description
-        self._reaction_count = reaction_count
+
+    @property
+    def id(self) -> str:
+        return self.emoji.emoji_id
 
     @classmethod
-    def from_dict(cls, data: Dict):
-        emoji = MultiEmoji(data.get("emoji"))
-        value = data.get("value")
-        description = data.get("description")
+    def from_dict(cls, data: Dict) -> "MenuOption":
+        data["emoji"] = ReactionEmoji(data["emoji"])
         try:
-            reaction_count = int(data.get("reaction_count"))
+            data["reaction_count"] = int(data.get("reaction_count"))
         except ValueError:
-            reaction_count = 0
-        return ReactableOption(emoji, value, description, reaction_count)
+            data["reaction_count"] = 0
+        return MenuOption(**data)
+
+    @property
+    def description(self) -> str:
+        if isinstance(self._description, Role) or isinstance(
+            self._description, GuildChannel
+        ):
+            return self._description.mention
+        else:
+            return str(self._description)
+
+    @property
+    def label(self) -> str:
+        if isinstance(self._description, Role):
+            return f"{self._description.name} (Role)"
+        elif isinstance(self._description, GuildChannel):
+            return f"{self._description.name} (Channel)"
+        else:
+            return str(self._description)
+
+    @property
+    def emoji(self) -> Union[PartialEmoji, Emoji]:
+        return self._emoji.discord_emoji
 
     def to_dict(self) -> Dict:
-        data = {"emoji": self._emoji.to_dict(),
-                "value": self._value,
-                "description": self._description,
-                "reaction_count": int(self._reaction_count),
-                }
-
-        return data
+        return {
+            "emoji": self.emoji.to_dict(),
+            "description": self.description,
+            "reaction_count": self.reaction_count,
+        }
 
     def __str__(self) -> str:
-        return f"{self.emoji.discord_emoji} **—** {self.value}"
+        return f"{self.emoji} **—** {self.description}"
 
     def __repr__(self) -> str:
-        return f"Emoji: {self.emoji.discord_emoji}\n Value: {self.value!r}\n Description: {self.description!r}"
-
-    @staticmethod
-    def _format_value(value):
-        if isinstance(value, Role):
-            return str(value.mention)
-        elif isinstance(value, GuildChannel):
-            return str(value.mention)
-        else:
-            return str(value)
-
-    @property
-    def value(self):
-        return self._value
-
-    @property
-    def emoji(self):
-        return self._emoji
-
-    @property
-    def description(self):
-        return self._description
-
-    @property
-    def reaction_count(self):
-        return self._reaction_count
-
-    @reaction_count.setter
-    def reaction_count(self, value):
-        self._reaction_count = value
-
-    def get_emoji(self) -> MultiEmoji:
-        """
-        Get the emoji used to react for this option.
-        :return: A MultiEmoji representing this reaction option.
-        """
-        return self.emoji
-
-    def get_value(self) -> Any:
-        """
-        Get the value of this reaction option.
-        :return: Get the value of this reaction option.
-        """
-        return self.value
-
-    def get_description(self) -> str:
-        """
-        Get the extra details of this reaction option.
-        :return: A string that represents any extra details regarding this reaction option.
-        """
-        return self.description
-
-    def add_reaction(self, count: int = 1) -> int:
-        """
-        Increase the number of reactions on this reaction option.
-        :param count: The number of reactions to increase by.
-        :return: The number of reactions after the change.
-        """
-        self._reaction_count += count
-        return self.reaction_count
-
-    def remove_reaction(self, count: int = 1) -> int:
-        """
-        Reduce the number of reactions on this reaction option.
-        :param count: The number of reactions to reduce by.
-        :return: The number of reactions after the change.
-        """
-        self._reaction_count -= count
-        return self.reaction_count
+        return f"{{Emoji: {self.emoji.discord_emoji}, Description: {self.description!r}, Reaction Count: {self.reaction_count!r}}}"
