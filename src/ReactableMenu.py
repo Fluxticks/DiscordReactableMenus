@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from typing import Any, Callable, Dict, Tuple, Union
 from discord import (
     Emoji,
@@ -16,7 +17,7 @@ from discord.ext import commands
 from src.EmojiHandler import ReactionEmoji
 
 
-class ReactableMenu:
+class MenuBase:
     def __init__(
         self,
         title: str,
@@ -28,15 +29,12 @@ class ReactableMenu:
         disabled_color: Color = Color.red(),
         message_id: int = None,
         message: Message = None,
-        view: View = None,
-        on_button_click: Callable = None,
         use_inline: bool = False,
         show_id: bool = False,
-        button_labels: bool = False,
         auto_enable: bool = False,
         **kwargs,
     ):
-        """Creates a ReactableMenu that can have its options customised and actions upon interaction customised.
+        """Creates a reactable menu that can have its options customised and actions upon interaction customised.
 
         Args:
             title (str): The title of the menu. Is used as the title in the embed.
@@ -48,11 +46,8 @@ class ReactableMenu:
             disabled_color (Color, optional): The embed color to use when the menu is disabled. Defaults to Color.red().
             message_id (int, optional): The ID of the messsage the menu is tied to. Defaults to None.
             message (Message, optional): The message object the menu is tied to. Defaults to None.
-            view (View, optional): The view that is used to display the buttons that users interact with. Defaults to None.
-            on_button_click (Callable, optional): The function that is called when a user interacts with the menu. Must be async. Defaults to None.
             use_inline (bool, optional): Toggles if the embed uses in-line fields or not. Defaults to False.
             show_id (bool, optional): Toggles if the ID of the menu should be displayed in the footer of the menu. Defaults to False.
-            button_labels (bool, optional): Toggles if the buttons in the menu should have the label in them or only the emoji. Defaults to False.
             auto_enable (bool, optional): Determines if the menu is automatically enabled after being sent. Defaults to False.
         """
         self.title = title
@@ -65,7 +60,6 @@ class ReactableMenu:
 
         self.message = message
         self.message_id = message_id
-        self.view = view
         if self.message is not None:
             self.channel = message.channel
             self.guild = message.channel.guild
@@ -79,16 +73,13 @@ class ReactableMenu:
             self.channel_id = None
             self.guild_id = None
 
-        self.on_button_click = on_button_click
-
         self.use_inline = use_inline
         self.show_id = show_id
-        self.button_labels = button_labels
         self.auto_enable = auto_enable
         self.enabled = False
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "ReactableMenu":
+    def from_dict(cls, data: Dict) -> "MenuBase":
         """Creates a ReactableMenu from a dictionary of kwargs. Can be used to load a menu from a database.
 
         Args:
@@ -103,29 +94,23 @@ class ReactableMenu:
             data["enabled_color"] = Color(int(data.get("enabled_color")))
         if data.get("disabled_color"):
             data["disabled_color"] = Color(int(data.get("disabled_color")))
-        return ReactableMenu(**data)
+        return MenuBase(**data)
 
-    def to_dict(self) -> Dict:
-        """Creates a dictionary from a ReactableMenu. Allows for saving and with from_dict loading of ReactableMenus to a database.
+    @abstractmethod
+    def to_dict(self):
+        pass
 
-        Returns:
-            Dict: The dictionary representation of a ReactableMenu.
-        """
-        options = [x.to_dict() for x in self.options.values()]
-        data = {
-            "title": self.title,
-            "title_disabled_suffix": self.title_disabled_suffix,
-            "description": self.description,
-            "description_meta": self.description_meta,
-            "enabled_color": self.enabled_color.value,
-            "disabled_color": self.disabled_color.value,
-            "use_inline": self.use_inline,
-            "show_id": self.show_id,
-            "button_labels": self.button_labels,
-            "enabled": self.enabled,
-            "options": options,
-        }
-        return data
+    @abstractmethod
+    def send_menu(self, channel):
+        pass
+
+    @abstractmethod
+    def enable(self, *args, **kwargs):
+        pass
+
+    @abstractmethod
+    def disable(self, *args, **kwargs):
+        pass
 
     @property
     def id(self) -> int:
@@ -195,54 +180,6 @@ class ReactableMenu:
 
         return embed
 
-    def build_view(self, is_persistent: bool = False, timeout: int = 180) -> View:
-        """Build the view object that represents a menu. Can be then sent in a message.
-
-        Args:
-            is_persistent (bool, optional): If the view should be persistent. Defaults to False.
-            timeout (int, optional): If the view is not persistent, how long should it last. Defaults to 180.
-
-        Returns:
-            View: The view object that represent a ReactableMenu.
-        """
-        if is_persistent:
-            self.view = View(timeout=None)
-        else:
-            self.view = View(timeout=timeout)
-
-        if self.enabled:
-            self.view.add_item(
-                Button(
-                    label="",
-                    emoji="⏹️",
-                    custom_id=f"disable_{self.message_id}",
-                    style=ButtonStyle.red,
-                )
-            )
-
-            for emoji_id, option in self.options.items():
-                self.view.add_item(
-                    Button(
-                        label=option.label if self.button_labels else "",
-                        emoji=option.emoji,
-                        custom_id=f"{emoji_id}_{self.message_id}",
-                    )
-                )
-        else:
-            self.view.add_item(
-                Button(
-                    label="",
-                    emoji="▶️",
-                    custom_id=f"enable_{self.message_id}",
-                    style=ButtonStyle.green,
-                )
-            )
-
-        for item in self.view.children:
-            item.callback = self.on_interaction_handler
-
-        return self.view
-
     def generate_title(self) -> str:
         """Generate the title text for the embed.
 
@@ -297,6 +234,52 @@ class ReactableMenu:
         """
         return f"Menu ID: {self.message_id}"
 
+
+class InteractionMenu(MenuBase):
+    def __init__(
+        self,
+        title: str,
+        view: View = None,
+        on_button_click: Callable = None,
+        button_labels: bool = False,
+        **kwargs,
+    ):
+        """Creates a reactable menu that uses Discord interactions to operate.
+
+        Args:
+            title (str): The title of the menu. Is used as the title in the embed.
+            view (View, optional): The view that is used to display the buttons that users interact with. Defaults to None.
+            on_button_click (Callable, optional): The function that is called when a user interacts with the menu. Must be async. Defaults to None.
+            button_labels (bool, optional): Toggles if the buttons in the menu should have the label in them or only the emoji. Defaults to False.
+        """
+        super().__init__(title, **kwargs)
+
+        self.on_button_click = on_button_click
+        self.view = view
+        self.button_labels = button_labels
+
+    def to_dict(self) -> Dict:
+        """Creates a dictionary from a ReactableMenu. Allows for saving and with from_dict loading of ReactableMenus to a database.
+
+        Returns:
+            Dict: The dictionary representation of a ReactableMenu.
+        """
+        options = [x.to_dict() for x in self.options.values()]
+        data = {
+            "title": self.title,
+            "title_disabled_suffix": self.title_disabled_suffix,
+            "description": self.description,
+            "description_meta": self.description_meta,
+            "enabled_color": self.enabled_color.value,
+            "disabled_color": self.disabled_color.value,
+            "use_inline": self.use_inline,
+            "show_id": self.show_id,
+            "button_labels": self.button_labels,
+            "enabled": self.enabled,
+            "options": options,
+        }
+        return data
+
     async def enable(self) -> None:
         """Enable the current menu.
 
@@ -316,6 +299,25 @@ class ReactableMenu:
             if not self.message:
                 return None
             await self.message.edit(embed=self.build_embed(), view=self.build_view())
+
+    async def send_menu(self, channel: GuildChannel) -> Message:
+        """Send the menu to a given channel.
+
+        Args:
+            channel (GuildChannel): The Discord channel to send the menu to.
+
+        Returns:
+            Message: The message that was created by the menu and in which the menu is.
+        """
+        # Send a temporary message so that we have an exisiting message object to reference
+        self.message = await channel.send("_Building reaction menu..._")
+        self.message_id = self.message.id
+        self.enabled = self.auto_enable
+
+        await self.message.edit(
+            content="​", embed=self.build_embed(), view=self.build_view()
+        )
+        return self.message
 
     async def on_interaction_handler(self, interaction: Interaction) -> bool:
         """The function that is called whenever the view for the given ReactableMenu is interacted with. Will perform some checks and then will run the given on_button_click function.
@@ -361,24 +363,53 @@ class ReactableMenu:
             )
         return False
 
-    async def send_menu(self, channel: GuildChannel) -> Message:
-        """Send the menu to a given channel.
+    def build_view(self, is_persistent: bool = False, timeout: int = 180) -> View:
+        """Build the view object that represents a menu. Can be then sent in a message.
 
         Args:
-            channel (GuildChannel): The Discord channel to send the menu to.
+            is_persistent (bool, optional): If the view should be persistent. Defaults to False.
+            timeout (int, optional): If the view is not persistent, how long should it last. Defaults to 180.
 
         Returns:
-            Message: The message that was created by the menu and in which the menu is.
+            View: The view object that represent a ReactableMenu.
         """
-        # Send a temporary message so that we have an exisiting message object to reference
-        self.message = await channel.send("_Building reaction menu..._")
-        self.message_id = self.message.id
-        self.enabled = self.auto_enable
+        if is_persistent:
+            self.view = View(timeout=None)
+        else:
+            self.view = View(timeout=timeout)
 
-        await self.message.edit(
-            content="​", embed=self.build_embed(), view=self.build_view()
-        )
-        return self.message
+        if self.enabled:
+            self.view.add_item(
+                Button(
+                    label="",
+                    emoji="⏹️",
+                    custom_id=f"disable_{self.message_id}",
+                    style=ButtonStyle.red,
+                )
+            )
+
+            for emoji_id, option in self.options.items():
+                self.view.add_item(
+                    Button(
+                        label=option.label if self.button_labels else "",
+                        emoji=option.emoji,
+                        custom_id=f"{emoji_id}_{self.message_id}",
+                    )
+                )
+        else:
+            self.view.add_item(
+                Button(
+                    label="",
+                    emoji="▶️",
+                    custom_id=f"enable_{self.message_id}",
+                    style=ButtonStyle.green,
+                )
+            )
+
+        for item in self.view.children:
+            item.callback = self.on_interaction_handler
+
+        return self.view
 
 
 class MenuOption:
