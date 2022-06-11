@@ -36,6 +36,14 @@ class ReactionEmoji:
     def __init__(
         self, emoji_input: Union[PartialEmoji, Emoji, Dict, str, "ReactionEmoji"]
     ):
+        """Creates a universal emoji handler so that given some emoji, a Discord presentable emoji can be obtained.
+
+        Args:
+            emoji_input (Union[PartialEmoji, Emoji, Dict, str, ReactionEmoji]): The emoji to convert.
+
+        Raises:
+            ValueError: If the given input is not of a valid type a ValueError will be raised.
+        """
         if isinstance(emoji_input, str):
             self.partial = string_to_partial_emoji(emoji_input)
         elif isinstance(emoji_input, Emoji):
@@ -51,25 +59,58 @@ class ReactionEmoji:
 
     @property
     def name(self) -> str:
+        """Get the name of the emoji.
+
+        Returns:
+            str: The name of the emoji.
+        """
         return self.partial.name
 
     @property
     def emoji_id(self) -> str:
+        """Get the ID of the emoji. If the emoji is a unicode emoji, its name will be returned.
+
+        Returns:
+            str: The ID of the emoji.
+        """
         return str(self.partial.id) if self.partial.id else self.name
 
     @property
     def animated(self) -> bool:
+        """If the emoji is a custom animated Discord emoji.
+
+        Returns:
+            bool: If the emoji is animated.
+        """
         return self.partial.animated
 
     @property
     def discord_emoji(self) -> PartialEmoji:
+        """Get a Discord representable emoji of the current emoji.
+
+        Returns:
+            PartialEmoji: A Discord representable emoji.
+        """
         return self.partial
 
     @classmethod
     def from_dict(cls, emoji_data: Dict) -> "ReactionEmoji":
+        """Create an emoji from dictionary data.
+
+        Args:
+            emoji_data (Dict): The emoji data to convert.
+
+        Returns:
+            ReactionEmoji: The handled emoji from the given data.
+        """
         return ReactionEmoji(PartialEmoji.from_dict(emoji_data))
 
     def to_dict(self) -> Dict:
+        """Get a dictionary representation of the current emoji.
+
+        Returns:
+            Dict: The dictionary of the emoji.
+        """
         return self.partial.to_dict()
 
     def __str__(self) -> str:
