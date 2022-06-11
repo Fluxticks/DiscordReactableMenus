@@ -13,7 +13,6 @@ from discord import (
 )
 from discord.ui import View, Button, Select
 from discord.abc import GuildChannel
-from discord.ext import commands
 
 from src.EmojiHandler import ReactionEmoji
 
@@ -81,13 +80,13 @@ class MenuBase:
 
     @classmethod
     def from_dict(cls, data: Dict) -> "MenuBase":
-        """Creates a ReactableMenu from a dictionary of kwargs. Can be used to load a menu from a database.
+        """Creates a MenuBase object from a dictionary of kwargs. Can be used to load a menu from a database.
 
         Args:
-            data (Dict): The data used to instantiate a ReactableMenu.
+            data (Dict): The data used to instantiate a new menu.
 
         Returns:
-            ReactableMenu: The ReactableMenu that was created from the given data dictionary.
+            ReactableMenu: The MenuBase object that was created from the given data dictionary.
         """
         options_list = [MenuOption(x) for x in data.get("options", [])]
         data["options"] = {x.id: x for x in options_list}
@@ -98,10 +97,10 @@ class MenuBase:
         return MenuBase(**data)
 
     def to_dict(self) -> Dict:
-        """Creates a dictionary from a ReactableMenu. Allows for saving and with from_dict loading of ReactableMenus to a database.
+        """Creates a dictionary from a menu. Allows for saving and with from_dict loading of menus to a database.
 
         Returns:
-            Dict: The dictionary representation of a ReactableMenu.
+            Dict: The dictionary representation of a menu.
         """
         options = [x.to_dict() for x in self.options.values()]
         data = {
@@ -119,15 +118,22 @@ class MenuBase:
         return data
 
     @abstractmethod
-    def send_menu(self, channel):
+    def send_menu(self, channel: GuildChannel):
+        """Used to send the menu to a channel. This method sets the message attribute, builds the menu and then sends it.
+
+        Args:
+            channel (GuildChannel): The channel to send the menu in.
+        """
         pass
 
     @abstractmethod
     def enable(self, *args, **kwargs):
+        """Method used to enable the menu."""
         pass
 
     @abstractmethod
     def disable(self, *args, **kwargs):
+        """Method used to disable the menu"""
         pass
 
     @property
@@ -142,7 +148,7 @@ class MenuBase:
     def add_option(
         self, given_emoji: Union[PartialEmoji, Emoji, str], description: Any
     ) -> bool:
-        """Add an option to a ReactableMenu. Each option is an emoji associated with some data.
+        """Add an option to a menu. Each option is an emoji associated with some data.
 
         Args:
             given_emoji (Union[PartialEmoji, Emoji, str]): The emoji to use for the option.
@@ -261,6 +267,13 @@ class InteractionMenu(MenuBase):
         view: View = None,
         **kwargs,
     ):
+        """Creates a reactable menu that uses the Discord Interaction system to handle events.
+
+        Args:
+            title (str): The title of the menu. Displays in the title of the embed.
+            interaction_handler (Callable, optional): The coroutine that handles the interactions. Must be async. Defaults to None.
+            view (View, optional): The view used to hold the components that users interact with. Defaults to None.
+        """
         super().__init__(title, **kwargs)
         self.interaction_handler = interaction_handler
         self.view = view
@@ -305,7 +318,7 @@ class InteractionMenu(MenuBase):
         return self.message
 
     async def interaction_prehandler(self, interaction: Interaction) -> bool:
-        """The function that is called whenever the view for the given ReactableMenu is interacted with. Will perform some checks and then will run the given on_button_click function.
+        """The function that is called whenever the view for the given InteractionMenu is interacted with. Will perform some checks and then will run the given interaction_handler function.
 
         Args:
             interaction (Interaction): The interaction that caused the function to be called.
@@ -349,6 +362,15 @@ class InteractionMenu(MenuBase):
         return False
 
     def build_view(self, is_persistent: bool = False, timeout: int = 180) -> View:
+        """Build the view object that represents a menu. Can be then sent in a message.
+
+        Args:
+            is_persistent (bool, optional): If the view should be persistent. Defaults to False.
+            timeout (int, optional): If the view is not persistent, how long should it last. Defaults to 180.
+
+        Returns:
+            View: The view object that represent a InteractionMenu.
+        """
         for item in self.view.children:
             item.callback = self.interaction_prehandler
 
@@ -363,13 +385,12 @@ class ButtonMenu(InteractionMenu):
         button_style: ButtonStyle = ButtonStyle.primary,
         **kwargs,
     ):
-        """Creates a reactable menu that uses Discord interactions to operate.
+        """Creates an InterationMenu that uses Discord buttons to operate.
 
         Args:
             title (str): The title of the menu. Is used as the title in the embed.
-            view (View, optional): The view that is used to display the buttons that users interact with. Defaults to None.
-            on_button_click (Callable, optional): The function that is called when a user interacts with the menu. Must be async. Defaults to None.
             button_labels (bool, optional): Toggles if the buttons in the menu should have the label in them or only the emoji. Defaults to False.
+            button_style (ButtonStyle, optional): The style of the buttons that users interact with. Defaults to ButtonStyle.primary.
         """
         super().__init__(title, **kwargs)
 
@@ -377,6 +398,11 @@ class ButtonMenu(InteractionMenu):
         self.button_style = button_style
 
     def to_dict(self) -> Dict:
+        """Creates a dictionary from a menu. Allows for saving and with from_dict loading of menus to a database.
+
+        Returns:
+            Dict: The dictionary representation of a menu.
+        """
         data = super().to_dict()
         data["button_style"] = self.button_style
         data["button_labels"] = self.button_labels
@@ -390,7 +416,7 @@ class ButtonMenu(InteractionMenu):
             timeout (int, optional): If the view is not persistent, how long should it last. Defaults to 180.
 
         Returns:
-            View: The view object that represent a ReactableMenu.
+            View: The view object that represent a ButtonMenu.
         """
         if is_persistent:
             self.view = View(timeout=None)
@@ -433,19 +459,40 @@ class ButtonMenu(InteractionMenu):
 
 class SelectMenu(InteractionMenu):
     def __init__(
-        self, title, menu_labels: bool = False, placeholder: str = "", **kwargs
+        self, title: str, menu_labels: bool = False, placeholder: str = "", **kwargs
     ):
+        """Creates an InterationMenu that uses a Discord Select Menu to operate.
+
+        Args:
+            title (str): The title of the menu. Is used as the title in the embed.
+            menu_labels (bool, optional): Toggles if the options in the menu should have the label in them or only the emoji. Defaults to False.
+            placeholder (str, optional): The placeholder string that displays in the menu selector. Defaults to "".
+        """
         super().__init__(title, **kwargs)
         self.menu_labels = menu_labels
         self.placeholder = placeholder
 
     def to_dict(self) -> Dict:
+        """Creates a dictionary from a menu. Allows for saving and with from_dict loading of menus to a database.
+
+        Returns:
+            Dict: The dictionary representation of a menu.
+        """
         data = super().to_dict()
         data["menu_labels"] = self.menu_labels
         data["placeholder"] = self.placeholder
         return data
 
     def build_view(self, is_persistent: bool = False, timeout: int = 180) -> View:
+        """Build the view object that represents a menu. Can be then sent in a message.
+
+        Args:
+            is_persistent (bool, optional): If the view should be persistent. Defaults to False.
+            timeout (int, optional): If the view is not persistent, how long should it last. Defaults to 180.
+
+        Returns:
+            View: The view object that represent a SelectMenu.
+        """
         if is_persistent:
             self.view = View(timeout=None)
         else:
