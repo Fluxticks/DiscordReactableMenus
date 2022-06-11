@@ -7,6 +7,20 @@
 This package has base class menus that use Discord Buttons, Discord Select Menus as well as the traditional reactions.
 The intention for this package is to be used in a [Discord.py](https://github.com/Rapptz/discord.py) bot. 
 
+## Installation
+```bash
+$ git clone https://github.com/Fluxticks/DiscordReactableMenus
+$ cd DiscordReactableMenus
+$ pip install -U .
+```
+At the time of writing the latest release version of Discord does not have the required AppCommands and interactions implemented, so if still needed, peform the following to get the latest version with these changes:
+```bash
+git clone https://github.com/Rapptz/discord.py
+cd discord.py
+pip install -U .[voice]
+```
+
+## Getting Started
 Any level of a reactable menu can be extended through subclasses, however the three most useful with most of the functionality implemented are the `ButtonMenu`, `SelectMenu` and the `ReactionMenu`.
 These classes handle interactions with Discord Buttons, Discord Select Menus and traditional reactions respectively.
 Some examples of possible extensions of these classes are:
@@ -56,7 +70,7 @@ async def generic_reaction_event(paylod: discord.RawReactionActionEvent):
 reaction_menu = ReactionMenu(react_add_handler=on_react_add, react_remove_handler=on_react_remove)
 other_menu = ReactionMenu(react_add_handler=generic_reaction_event, react_remove_handler=generic_reaction_event)
 ```
-
+## Further Usage
 If your menu needs more attributes to keep track of more data you can subclass one of `ButtonMenu`, `SelectMenu`, `ReactionMenu` or even `InteractionMenu`.
 Going the route of a subclass will allow further customisation of things such as appearance.
 An important note is that the `to_dict()` and `from_dict()` methods may need to be extended for menu serial/deserialization if extra attributes/properties are added that need to be saved.
