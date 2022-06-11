@@ -15,9 +15,9 @@ $ pip install -U .
 ```
 At the time of writing the latest release version of Discord does not have the required AppCommands and interactions implemented, so if still needed, peform the following to get the latest version with these changes:
 ```bash
-git clone https://github.com/Rapptz/discord.py
-cd discord.py
-pip install -U .[voice]
+$ git clone https://github.com/Rapptz/discord.py
+$ cd discord.py
+$ pip install -U .[voice]
 ```
 
 ## Getting Started
