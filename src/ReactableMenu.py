@@ -2,6 +2,7 @@ from abc import abstractmethod
 from typing import Any, Callable, Dict, Tuple, Union
 from discord import (
     Emoji,
+    HTTPException,
     Interaction,
     Message,
     PartialEmoji,
@@ -13,6 +14,7 @@ from discord import (
 )
 from discord.ui import View, Button, Select
 from discord.abc import GuildChannel
+from discord.ext.commands import Bot
 
 from src.EmojiHandler import ReactionEmoji
 
@@ -317,7 +319,7 @@ class InteractionMenu(MenuBase):
         )
         return self.message
 
-    async def interaction_prehandler(self, interaction: Interaction) -> bool:
+    async def on_interact_event(self, interaction: Interaction) -> bool:
         """The function that is called whenever the view for the given InteractionMenu is interacted with. Will perform some checks and then will run the given interaction_handler function.
 
         Args:
@@ -372,7 +374,7 @@ class InteractionMenu(MenuBase):
             View: The view object that represent a InteractionMenu.
         """
         for item in self.view.children:
-            item.callback = self.interaction_prehandler
+            item.callback = self.on_interact_event
 
         return self.view
 
@@ -543,7 +545,114 @@ class SelectMenu(InteractionMenu):
 
 
 class ReactionMenu(MenuBase):
-    pass
+    def __init__(
+        self,
+        title: str,
+        react_add_handler: Callable = None,
+        react_remove_handler: Callable = None,
+        **kwargs,
+    ):
+        super().__init__(title, **kwargs)
+        self.react_add_handler = react_add_handler
+        self.react_remove_handler = react_remove_handler
+
+    async def send_menu(self, channel: GuildChannel, bot_instance: Bot):
+        self.message = await channel.send("_Building reaction menu..._")
+        self.message_id = self.message.id
+
+        if self.auto_enable:
+            await self.enable(bot_instance)
+        else:
+            self.enabled = True
+            await self.disable(bot_instance)
+
+        return self.message
+
+    async def enable(self, bot_instance: Bot):
+        if not self.enabled:
+            self.enabled = True
+            await self.update_menu()
+            bot_instance.add_listener(self.on_react_add_event, "on_raw_reaction_add")
+            bot_instance.add_listener(
+                self.on_react_remove_event, "on_raw_reaction_remove"
+            )
+            return True
+        return False
+
+    async def disable(self, bot_instance: Bot):
+        if self.enabled:
+            self.enabled = False
+            bot_instance.remove_listener(self.on_react_add_event, "on_raw_reaction_add")
+            bot_instance.remove_listener(
+                self.on_react_remove_event, "on_raw_reaction_remove"
+            )
+            await self.update_menu()
+            return True
+        return False
+
+    async def update_menu(self):
+        if not self.message:
+            raise ValueError("Cannot update message before creation!")
+
+        await self.message.edit(content="", embed=self.build_embed())
+        self.message = await self.message.channel.fetch_message(self.message_id)
+        if self.enabled:
+            await self.add_reactions()
+
+    async def add_reactions(self, message: Message = None):
+        if message is None and self.message is None:
+            raise ValueError("Cannot add reactions to empty message")
+
+        if message is None:
+            message = self.message
+
+        missing_emojis = [x.id for x in self.options.values()]
+        for react in self.message.reactions:
+            react_emoji = ReactionEmoji(react.emoji)
+            if react_emoji.emoji_id in missing_emojis:
+                missing_emojis.remove(react_emoji.emoji_id)
+            else:
+                await react.clear()
+
+        for emoji_id in missing_emojis:
+            emoji = self.options.get(emoji_id).emoji
+            try:
+                await message.add_reaction(emoji)
+            except HTTPException:
+                pass
+
+    async def on_react_add_event(self, payload):
+        if payload is None:
+            return None
+
+        if payload.member.bot:
+            return None
+
+        if payload.message_id != self.message_id:
+            return None
+
+        if self.react_add_handler is None:
+            return None
+
+        if self.enabled:
+            self.message = await self.message.channel.fetch_message(payload.message_id)
+            return await self.react_add_handler(payload)
+        return None
+
+    async def on_react_remove_event(self, payload):
+        if payload is None:
+            return None
+
+        if payload.message_id != self.message_id:
+            return None
+
+        if self.react_remove_handler is None:
+            return None
+
+        if self.enabled:
+            self.message = await self.message.channel.fetch_message(payload.message_id)
+            return await self.react_remove_handler(payload)
+        return None
 
 
 class MenuOption:
@@ -566,7 +675,7 @@ class MenuOption:
         Returns:
             str: The string of the ID of the emoji for the option.
         """
-        return self.emoji.emoji_id
+        return self._emoji.emoji_id
 
     @classmethod
     def from_dict(cls, data: Dict) -> "MenuOption":
