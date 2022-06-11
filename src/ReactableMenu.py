@@ -462,7 +462,12 @@ class ButtonMenu(InteractionMenu):
 
 class SelectMenu(InteractionMenu):
     def __init__(
-        self, title: str, menu_labels: bool = False, placeholder: str = "", **kwargs
+        self,
+        title: str,
+        menu_labels: bool = False,
+        placeholder: str = "",
+        max_select_count: int = 25,
+        **kwargs,
     ):
         """Creates an InterationMenu that uses a Discord Select Menu to operate.
 
@@ -470,10 +475,12 @@ class SelectMenu(InteractionMenu):
             title (str): The title of the menu. Is used as the title in the embed.
             menu_labels (bool, optional): Toggles if the options in the menu should have the label in them or only the emoji. Defaults to False.
             placeholder (str, optional): The placeholder string that displays in the menu selector. Defaults to "".
+            max_select_count (int, optional): The maximum number of items a user can select from the menu. Defaults to 25.
         """
         super().__init__(title, **kwargs)
         self.menu_labels = menu_labels
         self.placeholder = placeholder
+        self.max_select_count = max_select_count
 
     def to_dict(self) -> Dict:
         """Creates a dictionary from a menu. Allows for saving and with from_dict loading of menus to a database.
@@ -484,6 +491,7 @@ class SelectMenu(InteractionMenu):
         data = super().to_dict()
         data["menu_labels"] = self.menu_labels
         data["placeholder"] = self.placeholder
+        data["max_select_count"] = self.max_select_count
         return data
 
     def build_view(self, is_persistent: bool = False, timeout: int = 180) -> View:
@@ -512,7 +520,7 @@ class SelectMenu(InteractionMenu):
             )
 
         select_menu = Select(
-            max_values=len(select_options),
+            max_values=min(len(select_options), self.max_select_count),
             min_values=0,
             placeholder=self.placeholder,
             custom_id=f"selectmenu_{self.message_id}",
