@@ -32,6 +32,7 @@ class ReactableMenu:
         on_button_click: Callable = None,
         use_inline: bool = False,
         show_id: bool = False,
+        button_labels: bool = False,
         auto_enable: bool = False,
         **kwargs,
     ):
@@ -51,6 +52,7 @@ class ReactableMenu:
             on_button_click (Callable, optional): The function that is called when a user interacts with the menu. Must be async. Defaults to None.
             use_inline (bool, optional): Toggles if the embed uses in-line fields or not. Defaults to False.
             show_id (bool, optional): Toggles if the ID of the menu should be displayed in the footer of the menu. Defaults to False.
+            button_labels (bool, optional): Toggles if the buttons in the menu should have the label in them or only the emoji. Defaults to False.
             auto_enable (bool, optional): Determines if the menu is automatically enabled after being sent. Defaults to False.
         """
         self.title = title
@@ -81,6 +83,7 @@ class ReactableMenu:
 
         self.use_inline = use_inline
         self.show_id = show_id
+        self.button_labels = button_labels
         self.auto_enable = auto_enable
         self.enabled = False
 
@@ -118,6 +121,7 @@ class ReactableMenu:
             "disabled_color": self.disabled_color.value,
             "use_inline": self.use_inline,
             "show_id": self.show_id,
+            "button_labels": self.button_labels,
             "enabled": self.enabled,
             "options": options,
         }
@@ -219,7 +223,7 @@ class ReactableMenu:
             for emoji_id, option in self.options.items():
                 self.view.add_item(
                     Button(
-                        label=option.label,
+                        label=option.label if self.button_labels else "",
                         emoji=option.emoji,
                         custom_id=f"{emoji_id}_{self.message_id}",
                     )
