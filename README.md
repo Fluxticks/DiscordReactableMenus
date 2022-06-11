@@ -16,9 +16,9 @@ Some examples of possible extensions of these classes are:
 
 To use the base implementations in your bot, add one or multiple of the following import statements:
 ```python
-from ReactableMenu import ButtonMenu
-from ReactableMenu import SelectMenu
-from ReactableMenu import ReactionMenu
+from ReactableMenus import ButtonMenu
+from ReactableMenus import SelectMenu
+from ReactableMenus import ReactionMenu
 ```
 
 ### Button Menu
