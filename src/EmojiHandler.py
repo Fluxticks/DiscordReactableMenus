@@ -4,6 +4,14 @@ from discord import PartialEmoji, Emoji
 
 
 def string_to_partial_emoji(string_emoji: str) -> PartialEmoji:
+    """Turn a string into a PartialEmoji object.
+
+    Args:
+        string_emoji (str): The string containing emoji data.
+
+    Returns:
+        PartialEmoji: The PartialEmoji representing the given string.
+    """
     string_emoji = string_emoji.strip()
     converted_emoji = emoji.demojize(string_emoji, use_aliases=True)
     if converted_emoji == string_emoji:
@@ -24,6 +32,14 @@ def string_to_partial_emoji(string_emoji: str) -> PartialEmoji:
 
 
 def emoji_to_partial_emoji(full_emoji: Emoji) -> PartialEmoji:
+    """Turn a full Discord emoji into a PartialEmoji.
+
+    Args:
+        full_emoji (Emoji): The full Discord emoji to convert.
+
+    Returns:
+        PartialEmoji: The PartialEmoji equivalent of the given Discord Emoji.
+    """
     emoji_data = {
         "name": full_emoji.name,
         "id": full_emoji.id,
