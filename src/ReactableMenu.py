@@ -6,6 +6,7 @@ from discord import (
     Interaction,
     Message,
     PartialEmoji,
+    RawReactionActionEvent,
     Role,
     Color,
     Embed,
@@ -557,6 +558,11 @@ class ReactionMenu(MenuBase):
         self.react_remove_handler = react_remove_handler
 
     async def send_menu(self, channel: GuildChannel, bot_instance: Bot):
+        """Used to send the menu to a channel. This method sets the message attribute, builds the menu and then sends it.
+
+        Args:
+            channel (GuildChannel): The channel to send the menu in.
+        """
         self.message = await channel.send("_Building reaction menu..._")
         self.message_id = self.message.id
 
@@ -568,7 +574,15 @@ class ReactionMenu(MenuBase):
 
         return self.message
 
-    async def enable(self, bot_instance: Bot):
+    async def enable(self, bot_instance: Bot) -> bool:
+        """Enables the current menu.
+
+        Args:
+            bot_instance (Bot): The instance of the bot to add the listeners to.
+
+        Returns:
+            bool: True if the menu was enabled, False otherwise.
+        """
         if not self.enabled:
             self.enabled = True
             await self.update_menu()
@@ -579,7 +593,15 @@ class ReactionMenu(MenuBase):
             return True
         return False
 
-    async def disable(self, bot_instance: Bot):
+    async def disable(self, bot_instance: Bot) -> bool:
+        """Disables the current menu.
+
+        Args:
+            bot_instance (Bot): The instance of the bot to remove the listeners to.
+
+        Returns:
+            bool: True if the menu was disabled, False otherwise.
+        """
         if self.enabled:
             self.enabled = False
             bot_instance.remove_listener(self.on_react_add_event, "on_raw_reaction_add")
@@ -590,7 +612,12 @@ class ReactionMenu(MenuBase):
             return True
         return False
 
-    async def update_menu(self):
+    async def update_menu(self) -> None:
+        """Update the menu's embed and reactions.
+
+        Raises:
+            ValueError: If the message has not been created ValueError will be raised.
+        """
         if not self.message:
             raise ValueError("Cannot update message before creation!")
 
@@ -599,7 +626,15 @@ class ReactionMenu(MenuBase):
         if self.enabled:
             await self.add_reactions()
 
-    async def add_reactions(self, message: Message = None):
+    async def add_reactions(self, message: Message = None) -> None:
+        """Add the reactions to the menu for users to click on.
+
+        Args:
+            message (Message, optional): The message to add reactions to. If left as None the menu's own message will be added to. Defaults to None.
+
+        Raises:
+            ValueError: If the current message for the menu is None and no message is given, ValueError is raised.
+        """
         if message is None and self.message is None:
             raise ValueError("Cannot add reactions to empty message")
 
@@ -621,7 +656,15 @@ class ReactionMenu(MenuBase):
             except HTTPException:
                 pass
 
-    async def on_react_add_event(self, payload):
+    async def on_react_add_event(self, payload: RawReactionActionEvent) -> Any:
+        """The event handler for when a reaction is added to a message.
+
+        Args:
+            payload (RawReactionActionEvent): The reaction event payload data.
+
+        Returns:
+            Any: The result of the reaction add handler function if it is a valid reaction event, else None.
+        """
         if payload is None:
             return None
 
@@ -639,7 +682,15 @@ class ReactionMenu(MenuBase):
             return await self.react_add_handler(payload)
         return None
 
-    async def on_react_remove_event(self, payload):
+    async def on_react_remove_event(self, payload: RawReactionActionEvent) -> Any:
+        """The event handler for when a reaction is removed from a message.
+
+        Args:
+            payload (RawReactionActionEvent): The reaction event payload data.
+
+        Returns:
+            Any: The result of the reaction remove handler function if it is a valid reaction event, else None.
+        """
         if payload is None:
             return None
 
