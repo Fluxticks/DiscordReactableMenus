@@ -3,47 +3,75 @@
     <img src="https://img.shields.io/badge/min%20python%20version-3.8.0-green?style=flat-square" />    
 </div>  
 
-`DiscordReactableMenus` is a simple package that enables the creation of discord messages which can perform automated actions when users react to the message.
-The intention is for this package to be used inside a `Discord.py` bot, and its function customised to the needs of the commands.
-Some examples of possible uses are:
+`DiscordReactableMenus` is a simple package that eases the creation of interactable messages in a Discord server.
+This package has base class menus that use Discord Buttons, Discord Select Menus as well as the traditional reactions.
+The intention for this package is to be used in a [Discord.py](https://github.com/Rapptz/discord.py) bot. 
+
+## Installation
+```bash
+$ git clone https://github.com/Fluxticks/DiscordReactableMenus
+$ cd DiscordReactableMenus
+$ pip install -U .
+```
+At the time of writing the latest release version of Discord does not have the required AppCommands and interactions implemented, so if still needed, peform the following to get the latest version with these changes:
+```bash
+$ git clone https://github.com/Rapptz/discord.py
+$ cd discord.py
+$ pip install -U .[voice]
+```
+
+## Getting Started
+Any level of a reactable menu can be extended through subclasses, however the three most useful with most of the functionality implemented are the `ButtonMenu`, `SelectMenu` and the `ReactionMenu`.
+These classes handle interactions with Discord Buttons, Discord Select Menus and traditional reactions respectively.
+Some examples of possible extensions of these classes are:
 - Role reaction menus
 - Polls for user votes
+- Action confirmation/cancellation menu
 
-To use this in your bot, add the following import line:
+To use the base implementations in your bot, add one or multiple of the following import statements:
 ```python
-from ReactableMenu import ReactableMenu
+from ReactableMenus import ButtonMenu
+from ReactableMenus import SelectMenu
+from ReactableMenus import ReactionMenu
 ```
-The easiest option to get a ReactableMenu to perform an action is to first define a function (this must be `async`), which takes 1 argument, the `RawReactionActionEvent` payload:
+
+### Button Menu
 ```python
-async def custom_reaction_added_function(payload):
-    pass
+async def on_button_press(interaction: discord.Interaction):
+    button_id = interaction.data.get("custom_id")
+    # Perform some logic based on which button was pressed...
 
-async def custom_reaction_removed_function(payload):
-    pass
+button_menu = ButtonMenu(..., interaction_handler=on_button_press)
 ```
-and then when creating your ReactableMenu, give it the following kwargs:
+### Select Menu
 ```python
-reaction_menu = ReactableMenu(*args, add_func=custom_reaction_added_function, remove_func=custom_reaction_removed_function, **kwargs)
-```
-You do not need to have a function defined for both events, as you may only want to react to the `on_raw_reaction_add` or only the `on_raw_reaction_remove`.
+async def on_select_menu(interaction: discord.Interaction):
+    options_selected = interaction.data.get("values")
+    for item in options_selected:
+        option_id = item.get("custom_id")
+        # Perform some logic based on which options were selected...
 
-The other option is to go for a more in depth implementation by creating a subclass of the `ReactableMenu` class:
+select_menu = SelectMenu(..., interaction_handler=on_select_menu)
+```
+### Reaction Menu
 ```python
-from ReactableMenu import ReactableMenu
+async def on_react_add(payload: discord.RawReactionActionEvent):
+    emoji_reacted_with = payload.emoji
+    # Perform some logic based on which emoji was reacted with...
 
-class CustomMenu(ReactableMenu):
-    
-    def __init__(self, *args, **kwargs):
-        kwargs["add_func"] = self.react_add_func
-        kwargs["remove_func"] = self.react_remove_func
-        super().__init__(*args, **kwargs)
+async def on_react_remove(payload: discord.RawReactionActionEvent):
+    emoji_reaction_removed = payload.emoji
+    # Perform some logic based on which reaction was removed...
 
-    async def react_add_func(self, payload):
-        pass
+async def generic_reaction_event(paylod: discord.RawReactionActionEvent):
+    emoji_used = payload.emoji
+    # Handle both reactions added and removed in the same function
 
-    async def react_remove_func(self, payload):
-        pass
+reaction_menu = ReactionMenu(react_add_handler=on_react_add, react_remove_handler=on_react_remove)
+other_menu = ReactionMenu(react_add_handler=generic_reaction_event, react_remove_handler=generic_reaction_event)
 ```
+## Further Usage
+If your menu needs more attributes to keep track of more data you can subclass one of `ButtonMenu`, `SelectMenu`, `ReactionMenu` or even `InteractionMenu`.
 Going the route of a subclass will allow further customisation of things such as appearance.
 An important note is that the `to_dict()` and `from_dict()` methods may need to be extended for menu serial/deserialization if extra attributes/properties are added that need to be saved.
 The ReactableMenu has the following functions that can be overridden for appearance customisation:
@@ -52,9 +80,8 @@ The ReactableMenu has the following functions that can be overridden for appeara
 - `def generate_option_field()` , creates the name, value tuple to be given to a field element in a Discord Embed object.
 - `def generate_footer_text()` , creates the footer element of the Discord Embed object.
 - `def generate_colour()` , creates the colour element of the Discord Embed object.
-- `def generate_embed()` , creates the Discord Embed object based on the above functions.
-
-If you have any saved ReactableMenus from v1 of this packaged, the saved states can be converted to the new v2 implementation using `helpers.convert_v1_to_v2` function, which will output the corresponding v2 dictionary from a v1 dictionary.
+- `def build_embed()` , creates the Discord Embed object based on the above functions.
+- `def build_view()` , creates the buttons used to interact with the menu.
 
 ## Contributing
 Any suggestions regarding changes are welcome, so feel free to create a Fork and then create a PR.
