@@ -359,14 +359,14 @@ class InteractionMenu(MenuBase):
             return True
 
         if self.enabled:
-            # try:
-            await self.interaction_handler(self, interaction)
-            return True
-            # except:
-            # await interaction.response.send_message(
-            #     "There was an error handling your interaction, please contact a developer",
-            #     ephemeral=True,
-            # )
+            try:
+                await self.interaction_handler(self, interaction)
+                return True
+            except:
+                await interaction.response.send_message(
+                    "There was an error handling your interaction, please contact a developer",
+                    ephemeral=True,
+                )
         else:
             await interaction.response.send_message(
                 content="This menu is currently disabled!", ephemeral=True
