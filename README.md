@@ -13,11 +13,19 @@ $ git clone https://github.com/Fluxticks/DiscordReactableMenus
 $ cd DiscordReactableMenus
 $ pip install -U .
 ```
+or simply:
+```bash
+$ pip install -U git+https://github.com/Fluxticks/DiscordReactableMenus
+```
 At the time of writing the latest release version of Discord does not have the required AppCommands and interactions implemented, so if still needed, peform the following to get the latest version with these changes:
 ```bash
 $ git clone https://github.com/Rapptz/discord.py
 $ cd discord.py
 $ pip install -U .[voice]
+```
+or
+```bash
+$ pip install -U --install-option="--extras-require=voice" git+https://github.com/Rapptz/discord.py
 ```
 
 ## Getting Started
